@@ -252,85 +252,69 @@ function CheckoutPage() {
     }
   };
 
-  // ✅ FIXED: Create order with proper data structure
-  const createOrder = async () => {
-    try {
-      const token = localStorage.getItem('loop_token');
-      const cart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
-      
-      if (!selectedAddress) {
-        alert('Please add a shipping address');
-        return null;
-      }
-      
-      // ✅ FIX: Proper order data structure
-      const orderData = {
-        customer: {
-          name: selectedAddress.name || user?.name || 'Guest',
-          email: user?.email || 'guest@loop.in',
-          phone: selectedAddress.phone || user?.phone || '',
-          address: {
-            street: selectedAddress.street || '',
-            city: selectedAddress.city || '',
-            state: selectedAddress.state || '',
-            pincode: selectedAddress.pincode || '',
-            landmark: selectedAddress.landmark || ''
-          }
-        },
-        userId: user?._id || null,
-        items: cart.map(item => ({
-          productId: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          size: item.size || 'M'
-        })),
-        subtotal: subtotal,
-        shipping: shippingFee,
-        platformFee: platformFee,
-        gstPercent: gstPercent,
-        gstAmount: gstAmount,
-        handlingFee: handlingFee,
-        discount: couponDiscount,
-        couponCode: couponCode || '',
-        total: finalTotal,
-        paymentMethod: 'razorpay'
-      };
-
-      console.log('📦 Creating order with data:', orderData);
-
-      const response = await axios.post(`${API_URL}/api/orders`, orderData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+const createOrder = async () => {
+  try {
+    const token = localStorage.getItem('loop_token');
+    const cart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
+    
+    if (!selectedAddress) {
+      alert('Please add a shipping address');
+      return null;
+    }
+    
+    // ✅ FIX: Use productId correctly
+    const orderData = {
+      customer: {
+        name: selectedAddress.name || user?.name || 'Guest',
+        email: user?.email || 'guest@loop.in',
+        phone: selectedAddress.phone || user?.phone || '',
+        address: {
+          street: selectedAddress.street || '',
+          city: selectedAddress.city || '',
+          state: selectedAddress.state || '',
+          pincode: selectedAddress.pincode || '',
+          landmark: selectedAddress.landmark || ''
         }
-      });
-      
-      console.log('✅ Order created:', response.data);
-      return response.data;
-      
-    } catch (err) {
-      console.error('Error creating order:', err);
-      console.error('Response data:', err.response?.data);
-      console.error('Status:', err.response?.status);
-      throw err;
-    }
-  };
+      },
+      userId: user?._id || null,
+      items: cart.map(item => ({
+        productId: item.id,  // ✅ Keep as productId (backend expects productId)
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        size: item.size || 'M'
+      })),
+      subtotal: subtotal,
+      shipping: shippingFee,
+      platformFee: platformFee,
+      gstPercent: gstPercent,
+      gstAmount: gstAmount,
+      handlingFee: handlingFee,
+      discount: couponDiscount,
+      couponCode: couponCode || '',
+      total: finalTotal,
+      paymentMethod: 'razorpay'
+    };
 
-  // Clear cart after order
-  const clearCartAfterOrder = async () => {
-    try {
-      localStorage.removeItem('loop_cart');
-      const token = localStorage.getItem('loop_token');
-      if (token) {
-        await axios.delete(`${API_URL}/api/cart/clear`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+    console.log('📦 Creating order with data:', orderData);
+
+    const response = await axios.post(`${API_URL}/api/orders`, orderData, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
       }
-    } catch (error) {
-      console.error('Error clearing cart:', error);
-    }
-  };
+    });
+    
+    console.log('✅ Order created:', response.data);
+    return response.data;
+    
+  } catch (err) {
+    console.error('Error creating order:', err);
+    console.error('Response data:', err.response?.data);
+    console.error('Status:', err.response?.status);
+    throw err;
+  }
+};
 
   // ✅ FIXED: Initiate UPI Payment
   const initiateUPIPayment = async (app) => {
