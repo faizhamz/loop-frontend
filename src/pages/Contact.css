@@ -1,0 +1,97 @@
+.contact-page {
+  padding-top: 100px;
+  min-height: 100vh;
+  background: #000;
+}
+
+.contact-header {
+  margin-bottom: 30px;
+}
+
+.contact-header h1 {
+  color: #D4AF37;
+  font-size: 28px;
+}
+
+.contact-header p {
+  color: #888;
+  font-size: 14px;
+}
+
+.contact-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #888;
+}
+
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  background: #111;
+  border-radius: 12px;
+  border: 1px solid #222;
+  padding: 16px 20px;
+  transition: border-color 0.3s;
+}
+
+.contact-item:hover {
+  border-color: #333;
+}
+
+.contact-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  width: 40px;
+  text-align: center;
+}
+
+.contact-content {
+  flex: 1;
+}
+
+.contact-content h4 {
+  color: #D4AF37;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.contact-content a {
+  color: #fff;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.contact-content a:hover {
+  color: #D4AF37;
+}
+
+.contact-content p {
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .contact-page {
+    padding-top: 80px;
+  }
+
+  .contact-header h1 {
+    font-size: 22px;
+  }
+
+  .contact-grid {
+    grid-template-columns: 1fr;
+  }
+}

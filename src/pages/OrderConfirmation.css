@@ -1,0 +1,272 @@
+.order-confirmation-page {
+  padding-top: 100px;
+  min-height: 100vh;
+  background: #000;
+}
+
+.confirmation-header {
+  text-align: center;
+  padding: 30px 0;
+}
+
+.confirmation-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.confirmation-header h1 {
+  color: #28a745;
+  font-size: 28px;
+}
+
+.confirmation-subtitle {
+  color: #888;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+.confirmation-order-details {
+  background: #111;
+  border-radius: 12px;
+  border: 1px solid #333;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.order-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #222;
+}
+
+.order-detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  color: #888;
+  font-size: 14px;
+}
+
+.detail-value {
+  color: #fff;
+  font-weight: 500;
+}
+
+.confirmation-items {
+  background: #111;
+  border-radius: 12px;
+  border: 1px solid #333;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.confirmation-items h3 {
+  color: #D4AF37;
+  margin-bottom: 12px;
+  font-size: 16px;
+}
+
+.confirmation-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #222;
+}
+
+.confirmation-item:last-child {
+  border-bottom: none;
+}
+
+.item-name {
+  flex: 1;
+  font-size: 14px;
+}
+
+.item-qty {
+  color: #888;
+  font-size: 14px;
+  margin: 0 12px;
+}
+
+.item-price {
+  color: #D4AF37;
+  font-weight: 500;
+}
+
+.confirmation-rating {
+  background: #111;
+  border-radius: 12px;
+  border: 1px solid #333;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.confirmation-rating h3 {
+  color: #D4AF37;
+  margin-bottom: 4px;
+}
+
+.confirmation-rating p {
+  color: #888;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.rating-section {
+  margin: 16px 0;
+}
+
+.rating-label {
+  display: block;
+  color: #D4AF37;
+  font-size: 16px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.rating-comment {
+  width: 100%;
+  padding: 12px;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  resize: vertical;
+  margin-top: 12px;
+  font-family: inherit;
+}
+
+.rating-comment:focus {
+  outline: none;
+  border-color: #D4AF37;
+}
+
+.comment-char-count {
+  text-align: right;
+  color: #666;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.rating-error {
+  color: #ff4444;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.submit-rating-btn {
+  background: #D4AF37;
+  border: none;
+  color: #000;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 12px;
+}
+
+.submit-rating-btn:hover:not(:disabled) {
+  transform: scale(1.02);
+}
+
+.submit-rating-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.confirmation-thanks {
+  background: rgba(40, 167, 69, 0.1);
+  border: 1px solid rgba(40, 167, 69, 0.2);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.thanks-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.confirmation-thanks h3 {
+  color: #28a745;
+  margin-bottom: 4px;
+}
+
+.confirmation-thanks p {
+  color: #888;
+  font-size: 14px;
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.continue-shopping-btn,
+.view-orders-btn {
+  flex: 1;
+  min-width: 200px;
+  padding: 14px;
+  text-align: center;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.continue-shopping-btn {
+  background: #D4AF37;
+  color: #000;
+}
+
+.continue-shopping-btn:hover {
+  transform: scale(1.02);
+}
+
+.view-orders-btn {
+  background: #222;
+  color: #fff;
+  border: 1px solid #333;
+}
+
+.view-orders-btn:hover {
+  border-color: #D4AF37;
+}
+
+.confirmation-error {
+  text-align: center;
+  padding: 40px;
+}
+
+.confirmation-error h2 {
+  color: #ff4444;
+  margin-bottom: 16px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .order-confirmation-page {
+    padding-top: 80px;
+  }
+
+  .confirmation-header h1 {
+    font-size: 22px;
+  }
+
+  .confirmation-actions {
+    flex-direction: column;
+  }
+
+  .continue-shopping-btn,
+  .view-orders-btn {
+    width: 100%;
+  }
+}

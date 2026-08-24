@@ -1,0 +1,35 @@
+{
+  "name": "loop-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "axios": "^1.4.0",
+    "firebase": "^12.17.1",
+    "framer-motion": "^13.1.0",
+    "lucide-react": "^1.31.0",
+    "react": "^18.2.0",
+    "react-countup": "^6.5.3",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.85.0",
+    "react-intersection-observer": "^11.0.0",
+    "react-router-dom": "^6.30.4",
+    "react-scripts": "5.0.1",
+    "swr": "^2.5.1"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "node node_modules/react-scripts/scripts/build.js"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

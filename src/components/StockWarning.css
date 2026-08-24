@@ -1,0 +1,77 @@
+/* Stock Warning Styles */
+.stock-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.stock-warning.low-stock {
+  background: rgba(255, 136, 0, 0.15);
+  color: #ff8800;
+  border: 1px solid rgba(255, 136, 0, 0.2);
+}
+
+.stock-warning.out-of-stock {
+  background: rgba(255, 68, 68, 0.15);
+  color: #ff4444;
+  border: 1px solid rgba(255, 68, 68, 0.2);
+}
+
+.stock-icon {
+  font-size: 14px;
+}
+
+.stock-text {
+  font-size: 13px;
+}
+
+/* Variant stock status */
+.variant-stock-status {
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.variant-stock-status.in-stock {
+  color: #28a745;
+}
+
+.variant-stock-status.low-stock {
+  color: #ff8800;
+}
+
+.variant-stock-status.out-of-stock {
+  color: #ff4444;
+}
+
+/* Product page stock display */
+.product-stock-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.product-stock-display.in-stock {
+  background: rgba(40, 167, 69, 0.1);
+  border: 1px solid rgba(40, 167, 69, 0.2);
+  color: #28a745;
+}
+
+.product-stock-display.low-stock {
+  background: rgba(255, 136, 0, 0.1);
+  border: 1px solid rgba(255, 136, 0, 0.2);
+  color: #ff8800;
+}
+
+.product-stock-display.out-of-stock {
+  background: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.2);
+  color: #ff4444;
+}
