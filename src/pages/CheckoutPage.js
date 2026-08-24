@@ -252,75 +252,73 @@ function CheckoutPage() {
     }
   };
 
-  // ✅ FIXED: createOrder with correct productId
-  const createOrder = async () => {
-    try {
-      const token = localStorage.getItem('loop_token');
-      const cart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
-      
-      if (!selectedAddress) {
-        alert('Please add a shipping address');
-        return null;
-      }
-      
-      // ✅ IMPORTANT: Map cart items to use productId
-      const orderItems = cart.map(item => ({
-        productId: item.id,  // ← item.id becomes productId
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        size: item.size || 'M',
-        color: item.color || 'Black'
-      }));
-      
-      console.log('📦 Order items:', orderItems);
-      
-      const orderData = {
-        customer: {
-          name: selectedAddress.name || user?.name || 'Guest',
-          email: user?.email || 'guest@loop.in',
-          phone: selectedAddress.phone || user?.phone || '',
-          address: {
-            street: selectedAddress.street || '',
-            city: selectedAddress.city || '',
-            state: selectedAddress.state || '',
-            pincode: selectedAddress.pincode || '',
-            landmark: selectedAddress.landmark || ''
-          }
-        },
-        userId: user?._id || null,
-        items: orderItems,  // ← Use mapped items
-        subtotal: subtotal,
-        shipping: shippingFee,
-        platformFee: platformFee,
-        gstPercent: gstPercent,
-        gstAmount: gstAmount,
-        handlingFee: handlingFee,
-        discount: couponDiscount,
-        couponCode: couponCode || '',
-        total: finalTotal,
-        paymentMethod: 'razorpay'
-      };
-
-      console.log('📦 Creating order with data:', orderData);
-
-      const response = await axios.post(`${API_URL}/api/orders`, orderData, {
-        headers: { 
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log('✅ Order created:', response.data);
-      return response.data;
-      
-    } catch (err) {
-      console.error('Error creating order:', err);
-      console.error('Response data:', err.response?.data);
-      console.error('Status:', err.response?.status);
-      throw err;
+const createOrder = async () => {
+  try {
+    const token = localStorage.getItem('loop_token');
+    const cart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
+    
+    if (!selectedAddress) {
+      alert('Please add a shipping address');
+      return null;
     }
-  };
+    
+    // ✅ FIXED: Use _id instead of id
+    const orderItems = cart.map(item => ({
+      productId: item._id || item.id,  
+      name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      size: item.size || 'M',
+      color: item.color || 'Black'
+    }));
+    
+    console.log('📦 Order items with productId:', orderItems);
+    
+    const orderData = {
+      customer: {
+        name: selectedAddress.name || user?.name || 'Guest',
+        email: user?.email || 'guest@loop.in',
+        phone: selectedAddress.phone || user?.phone || '',
+        address: {
+          street: selectedAddress.street || '',
+          city: selectedAddress.city || '',
+          state: selectedAddress.state || '',
+          pincode: selectedAddress.pincode || '',
+          landmark: selectedAddress.landmark || ''
+        }
+      },
+      userId: user?._id || null,
+      items: orderItems,
+      subtotal: subtotal,
+      shipping: shippingFee,
+      platformFee: platformFee,
+      gstPercent: gstPercent,
+      gstAmount: gstAmount,
+      handlingFee: handlingFee,
+      discount: couponDiscount,
+      couponCode: couponCode || '',
+      total: finalTotal,
+      paymentMethod: 'razorpay'
+    };
+
+    console.log('📦 Creating order with data:', orderData);
+    const response = await axios.post(`${API_URL}/api/orders`, orderData, {
+      headers: { 
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    console.log('✅ Order created:', response.data);
+    return response.data;
+    
+  } catch (err) {
+    console.error('Error creating order:', err);
+    console.error('Response data:', err.response?.data);
+    console.error('Status:', err.response?.status);
+    throw err;
+  }
+};
 
   // Clear cart after order
   const clearCartAfterOrder = async () => {
