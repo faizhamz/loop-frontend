@@ -252,7 +252,7 @@ function CheckoutPage() {
     }
   };
 
-  // ✅ FIXED: createOrder with correct productId
+  // Create Order
   const createOrder = async () => {
     try {
       const token = localStorage.getItem('loop_token');
@@ -263,7 +263,6 @@ function CheckoutPage() {
         return null;
       }
       
-      // ✅ IMPORTANT: Map cart items to use productId
       const orderItems = cart.map(item => ({
         productId: item._id || item.id,
         name: item.name,
@@ -272,8 +271,6 @@ function CheckoutPage() {
         size: item.size || 'M',
         color: item.color || 'Black'
       }));
-      
-      console.log('📦 Order items:', orderItems);
       
       const orderData = {
         customer: {
@@ -302,8 +299,6 @@ function CheckoutPage() {
         paymentMethod: 'razorpay'
       };
 
-      console.log('📦 Creating order with data:', orderData);
-
       const response = await axios.post(`${API_URL}/api/orders`, orderData, {
         headers: { 
           Authorization: `Bearer ${token}`,
@@ -311,13 +306,10 @@ function CheckoutPage() {
         }
       });
       
-      console.log('✅ Order created:', response.data);
       return response.data;
       
     } catch (err) {
       console.error('Error creating order:', err);
-      console.error('Response data:', err.response?.data);
-      console.error('Status:', err.response?.status);
       throw err;
     }
   };
@@ -428,7 +420,7 @@ function CheckoutPage() {
     window.paymentPollInterval = pollInterval;
   };
 
-  // ✅ Initiate Razorpay Payment - FIXED
+  // Initiate Razorpay Payment
   const initiateRazorpayPayment = async () => {
     if (!selectedAddress) {
       alert('Please add a shipping address first');
@@ -442,7 +434,6 @@ function CheckoutPage() {
     setShowSupport(false);
     
     try {
-      // 1. Create order
       const order = await createOrder();
       if (!order) {
         setProcessing(false);
@@ -451,7 +442,6 @@ function CheckoutPage() {
       
       setOrderId(order.orderId);
       
-      // 2. Get Razorpay order
       const token = localStorage.getItem('loop_token');
       const response = await axios.post(`${API_URL}/api/create-razorpay-order`, {
         amount: finalTotal,
@@ -462,11 +452,6 @@ function CheckoutPage() {
       
       const razorpayOrder = response.data;
       
-      // Log for debugging
-      console.log('Razorpay Key:', process.env.REACT_APP_RAZORPAY_KEY_ID);
-      console.log('Razorpay Order:', razorpayOrder);
-      
-      // 3. Open Razorpay Checkout
       const options = {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID,
         amount: razorpayOrder.amount,
@@ -787,6 +772,35 @@ function CheckoutPage() {
                 <h3>💰 Order Summary</h3>
               </div>
               
+              {/* ✅ FREE SHIPPING PROGRESS - NEW FEATURE */}
+              {subtotal > 0 && subtotal < 999 && (
+                <div className="free-shipping-progress">
+                  <div className="free-shipping-info">
+                    <span className="free-shipping-icon">🚚</span>
+                    <span className="free-shipping-text">
+                      Add <strong>₹{999 - subtotal}</strong> more for FREE Shipping!
+                    </span>
+                  </div>
+                  <div className="free-shipping-bar">
+                    <div 
+                      className="free-shipping-bar-fill" 
+                      style={{ width: `${Math.min((subtotal / 999) * 100, 100)}%` }}
+                    />
+                  </div>
+                  <div className="free-shipping-status">
+                    <span>Progress</span>
+                    <span className="progress-amount">₹{subtotal} / ₹999</span>
+                  </div>
+                </div>
+              )}
+
+              {subtotal >= 999 && (
+                <div className="free-shipping-applied">
+                  <span>✅</span>
+                  <span>Free Shipping Applied! 🎉</span>
+                </div>
+              )}
+
               <div className="summary-breakdown">
                 <div className="summary-row">
                   <span>Item Total ({cart.reduce((sum, item) => sum + item.quantity, 0)} items)</span>

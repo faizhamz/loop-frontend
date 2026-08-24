@@ -140,14 +140,12 @@ function OrderHistory({ user, isLoggedIn }) {
     navigate('/checkout');
   }, [navigate]);
 
-  // ✅ Navigate to product page
   const goToProduct = (productId) => {
     if (productId) {
       navigate(`/product/${productId}`);
     }
   };
 
-  // ✅ Open WhatsApp
   const openWhatsApp = (orderId) => {
     if (!whatsappNumber) {
       alert('WhatsApp support number not available. Please contact us via email.');
@@ -233,7 +231,6 @@ function OrderHistory({ user, isLoggedIn }) {
   return (
     <div className="order-history-page">
       <div className="container">
-        {/* ===== HEADER WITH WHATSAPP ICON ===== */}
         <div className="order-history-header">
           <div className="header-content">
             <div>
@@ -244,7 +241,6 @@ function OrderHistory({ user, isLoggedIn }) {
               <div className="header-stats-badge">
                 <span>{stats.total} orders</span>
               </div>
-              {/* ✅ WhatsApp Help Icon */}
               {whatsappNumber && (
                 <button
                   className="whatsapp-help-btn"
@@ -276,7 +272,6 @@ function OrderHistory({ user, isLoggedIn }) {
           </div>
         ) : (
           <>
-            {/* ===== STATS ROW ===== */}
             <div className="order-stats-row">
               <div className="order-stat-card">
                 <span className="order-stat-number">{stats.total}</span>
@@ -296,7 +291,6 @@ function OrderHistory({ user, isLoggedIn }) {
               </div>
             </div>
 
-            {/* ===== FILTERS ===== */}
             <div className="order-filters-bar">
               <div className="order-filter-tabs">
                 <button
@@ -331,7 +325,6 @@ function OrderHistory({ user, isLoggedIn }) {
               </div>
             </div>
 
-            {/* ===== SEARCH ===== */}
             <div className="order-search-bar">
               <span className="search-icon">🔍</span>
               <input
@@ -345,7 +338,6 @@ function OrderHistory({ user, isLoggedIn }) {
               )}
             </div>
 
-            {/* ===== ORDER CARDS ===== */}
             <div className="orders-list">
               {filteredOrders.length === 0 ? (
                 <div className="no-orders-found">
@@ -373,7 +365,6 @@ function OrderHistory({ user, isLoggedIn }) {
                       className={`order-card ${isExpanded ? 'expanded' : ''}`}
                       style={{ animationDelay: `${index * 0.05}s` }}
                     >
-                      {/* ===== ORDER HEADER ===== */}
                       <div className="order-header">
                         <div className="order-header-left">
                           <span className="order-id"># {order.orderId}</span>
@@ -399,13 +390,11 @@ function OrderHistory({ user, isLoggedIn }) {
                         </div>
                       </div>
 
-                      {/* ===== ORDER ITEMS PREVIEW ===== */}
                       <div className="order-items-preview">
                         {order.items?.slice(0, 2).map((item, idx) => {
                           const productId = item.productId?._id || item.productId;
                           return (
                             <div key={idx} className="order-item-preview">
-                              {/* ✅ Product Image - Clickable */}
                               <div 
                                 className="item-preview-image clickable"
                                 onClick={() => goToProduct(productId)}
@@ -418,7 +407,6 @@ function OrderHistory({ user, isLoggedIn }) {
                                 )}
                               </div>
                               <div className="item-preview-details">
-                                {/* ✅ Product Name - Clickable */}
                                 <span 
                                   className="item-preview-name clickable"
                                   onClick={() => goToProduct(productId)}
@@ -443,7 +431,6 @@ function OrderHistory({ user, isLoggedIn }) {
                         )}
                       </div>
 
-                      {/* ===== ORDER FOOTER ===== */}
                       <div className="order-footer">
                         <div className="order-total">
                           <span className="total-label">Total:</span>
@@ -497,7 +484,7 @@ function OrderHistory({ user, isLoggedIn }) {
                         </div>
                       </div>
 
-                      {/* ===== EXPANDED DETAILS ===== */}
+                      {/* ✅ EXPANDED ORDER DETAILS WITH BREAKDOWN */}
                       {isExpanded && (
                         <div className="order-expanded">
                           {/* Full Items List */}
@@ -523,6 +510,48 @@ function OrderHistory({ user, isLoggedIn }) {
                                 </div>
                               );
                             })}
+                          </div>
+
+                          {/* ✅ ORDER BREAKDOWN */}
+                          <div className="order-breakdown">
+                            <h4>💰 Order Breakdown</h4>
+                            <div className="breakdown-row">
+                              <span>Subtotal ({order.items?.length || 0} items)</span>
+                              <span>₹{order.subtotal || 0}</span>
+                            </div>
+                            <div className="breakdown-row">
+                              <span>Shipping Fee</span>
+                              <span>₹{order.shipping || 0}</span>
+                            </div>
+                            <div className="breakdown-row">
+                              <span>Platform Fee</span>
+                              <span>₹{order.platformFee || 0}</span>
+                            </div>
+                            <div className="breakdown-row">
+                              <span>GST ({order.gstPercent || 12}%)</span>
+                              <span>₹{order.gstAmount || 0}</span>
+                            </div>
+                            <div className="breakdown-row">
+                              <span>Handling Fee</span>
+                              <span>₹{order.handlingFee || 0}</span>
+                            </div>
+                            {order.discount > 0 && (
+                              <div className="breakdown-row discount">
+                                <span>Discount</span>
+                                <span>-₹{order.discount}</span>
+                              </div>
+                            )}
+                            {order.couponCode && (
+                              <div className="breakdown-row coupon">
+                                <span>Coupon Applied</span>
+                                <span>✨ {order.couponCode}</span>
+                              </div>
+                            )}
+                            <div className="breakdown-divider"></div>
+                            <div className="breakdown-row total">
+                              <span><strong>Total</strong></span>
+                              <span><strong>₹{order.total}</strong></span>
+                            </div>
                           </div>
 
                           {/* Timeline */}
@@ -556,35 +585,6 @@ function OrderHistory({ user, isLoggedIn }) {
                             </div>
                           )}
 
-                          {/* ===== ORDER BREAKDOWN ===== */}
-                          <div className="order-breakdown">
-                            <h4>💰 Order Breakdown</h4>
-                            <div className="breakdown-row">
-                              <span>Subtotal ({order.items?.length || 0} items)</span>
-                              <span>₹{order.subtotal || 0}</span>
-                            </div>
-                            <div className="breakdown-row">
-                              <span>Shipping</span>
-                              <span>₹{order.shipping || 0}</span>
-                            </div>
-                            {order.discount > 0 && (
-                              <div className="breakdown-row discount">
-                                <span>Discount</span>
-                                <span>-₹{order.discount}</span>
-                              </div>
-                            )}
-                            {order.couponCode && (
-                              <div className="breakdown-row coupon">
-                                <span>Coupon Applied</span>
-                                <span>✨ {order.couponCode}</span>
-                              </div>
-                            )}
-                            <div className="breakdown-row total">
-                              <span>Total</span>
-                              <span>₹{order.total}</span>
-                            </div>
-                          </div>
-
                           {/* Rating Reminder */}
                           {showRating && (
                             <div className="rating-reminder">
@@ -601,7 +601,7 @@ function OrderHistory({ user, isLoggedIn }) {
                             </div>
                           )}
 
-                          {/* ✅ WhatsApp Help for this order */}
+                          {/* WhatsApp Help */}
                           {whatsappNumber && (
                             <div className="order-whatsapp-help">
                               <button
@@ -623,7 +623,7 @@ function OrderHistory({ user, isLoggedIn }) {
         )}
       </div>
 
-      {/* ===== RATING MODAL ===== */}
+      {/* Rating Modal */}
       {showRatingModal && ratingOrder && (
         <div className="rating-modal-overlay" onClick={() => setShowRatingModal(false)}>
           <div className="rating-modal" onClick={(e) => e.stopPropagation()}>
