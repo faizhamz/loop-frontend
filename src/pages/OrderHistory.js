@@ -431,6 +431,7 @@ function OrderHistory({ user, isLoggedIn }) {
                         )}
                       </div>
 
+                      {/* ✅ ORDER FOOTER - CANCEL BUTTON REMOVED */}
                       <div className="order-footer">
                         <div className="order-total">
                           <span className="total-label">Total:</span>
@@ -440,28 +441,6 @@ function OrderHistory({ user, isLoggedIn }) {
                           )}
                         </div>
                         <div className="order-actions-bar">
-                          {order.status === 'pending' && (
-                            <button 
-                              className="order-action-btn cancel"
-                              onClick={async () => {
-                                if (window.confirm('Cancel this order?')) {
-                                  try {
-                                    const token = localStorage.getItem('loop_token');
-                                    await axios.post(
-                                      `${API_URL}/api/orders/${order.orderId}/cancel`,
-                                      {},
-                                      { headers: { Authorization: `Bearer ${token}` } }
-                                    );
-                                    fetchOrders();
-                                  } catch (err) {
-                                    alert(err.response?.data?.error || 'Failed to cancel');
-                                  }
-                                }
-                              }}
-                            >
-                              ❌ Cancel
-                            </button>
-                          )}
                           {order.status === 'delivered' && (
                             <>
                               <button 
@@ -484,7 +463,7 @@ function OrderHistory({ user, isLoggedIn }) {
                         </div>
                       </div>
 
-                      {/* EXPANDED ORDER DETAILS WITH BREAKDOWN */}
+                      {/* EXPANDED ORDER DETAILS */}
                       {isExpanded && (
                         <div className="order-expanded">
                           {/* Full Items List */}
@@ -512,7 +491,7 @@ function OrderHistory({ user, isLoggedIn }) {
                             })}
                           </div>
 
-                          {/* ✅ ORDER BREAKDOWN WITH FREE BADGES */}
+                          {/* Order Breakdown */}
                           <div className="order-breakdown">
                             <h4>💰 Order Breakdown</h4>
                             
@@ -521,7 +500,6 @@ function OrderHistory({ user, isLoggedIn }) {
                               <span>₹{order.subtotal || 0}</span>
                             </div>
                             
-                            {/* Shipping - Show FREE when 0 */}
                             <div className="breakdown-row">
                               <span>🚚 Shipping Fee</span>
                               {order.shipping === 0 ? (
@@ -531,13 +509,11 @@ function OrderHistory({ user, isLoggedIn }) {
                               )}
                             </div>
                             
-                            {/* Platform Fee - Always FREE */}
                             <div className="breakdown-row">
                               <span>✨ Platform Fee</span>
                               <span className="free-badge platform">FREE</span>
                             </div>
                             
-                            {/* Handling Fee - Always FREE */}
                             <div className="breakdown-row">
                               <span>💫 Handling Fee</span>
                               <span className="free-badge handling">FREE</span>
