@@ -3028,3 +3028,176 @@ html {
     font-size: 13px;
   }
 }
+/* ============================================
+   ANIMATED GRADIENT HERO BACKGROUND
+   ============================================ */
+
+.hero {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  
+  /* ✅ Kawaii Animated Gradient - Light Mode */
+  background: linear-gradient(135deg, 
+    #FFE4E8 0%, 
+    #FFB7C5 20%, 
+    #D4A5FF 40%, 
+    #B5EAD7 60%, 
+    #A8D8EA 75%, 
+    #FFDAC1 90%, 
+    #FFF5F9 100%
+  );
+  background-size: 500% 500%;
+  animation: gradientFlow 15s ease infinite;
+}
+
+/* Dark Mode Support */
+.dark-theme .hero {
+  background: linear-gradient(135deg, 
+    #2D1B2E 0%, 
+    #1a1a2e 25%, 
+    #0a0a0a 50%, 
+    #1a1a2e 75%, 
+    #2D1B2E 100%
+  );
+  background-size: 400% 400%;
+  animation: gradientFlow 12s ease infinite;
+}
+
+/* Optional: Add a subtle overlay for better text readability */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dark-theme .hero::after {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 100% 0%; }
+  50% { background-position: 100% 50%; }
+  75% { background-position: 0% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Optional: Floating particles/glow effect */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 30% 50%,
+    rgba(255, 183, 197, 0.3) 0%,
+    transparent 60%
+  );
+  animation: glowPulse 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dark-theme .hero::before {
+  background: radial-gradient(
+    ellipse at 30% 50%,
+    rgba(212, 175, 55, 0.15) 0%,
+    transparent 60%
+  );
+}
+
+@keyframes glowPulse {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.5; }
+  50% { transform: scale(1.2) rotate(5deg); opacity: 1; }
+}
+
+/* Enhanced Logo Colors on Gradient */
+.hero-l-big,
+.hero-p-big {
+  color: #2D1B2E;
+  text-shadow: 0 4px 30px rgba(255, 255, 255, 0.3);
+}
+
+.dark-theme .hero-l-big,
+.dark-theme .hero-p-big {
+  color: #ffffff;
+  text-shadow: 0 4px 30px rgba(212, 175, 55, 0.15);
+}
+
+.hero-infinity-big {
+  color: #D4AF37;
+  text-shadow: 0 0 40px rgba(212, 175, 55, 0.4),
+               0 0 80px rgba(212, 175, 55, 0.2),
+               0 0 120px rgba(212, 175, 55, 0.1);
+}
+
+.dark-theme .hero-infinity-big {
+  text-shadow: 0 0 40px rgba(212, 175, 55, 0.6),
+               0 0 80px rgba(212, 175, 55, 0.3),
+               0 0 120px rgba(212, 175, 55, 0.15);
+}
+
+.hero-tagline {
+  color: #2D1B2E;
+  text-shadow: 0 2px 20px rgba(255, 255, 255, 0.2);
+}
+
+.dark-theme .hero-tagline {
+  color: #D4AF37;
+  text-shadow: 0 2px 20px rgba(212, 175, 55, 0.1);
+}
+
+/* Enhanced CTA Button */
+.cta-button {
+  background: #D4AF37;
+  color: #000;
+  border: none;
+  padding: 16px 48px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 40px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  animation: fadeInUp 1s ease 0.6s both;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(212, 175, 55, 0.3);
+}
+
+.cta-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+.cta-button:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(212, 175, 55, 0.4);
+}
+
+.cta-button:hover::before {
+  left: 100%;
+}
+
+.cta-button:active {
+  transform: scale(0.95);
+}
