@@ -52,10 +52,8 @@ function CheckoutPage() {
   // Fee States
   const [subtotal, setSubtotal] = useState(0);
   const [shippingFee, setShippingFee] = useState(60);
-  const [platformFee, setPlatformFee] = useState(20);
-  const [gstPercent, setGstPercent] = useState(12);
-  const [gstAmount, setGstAmount] = useState(0);
-  const [handlingFee, setHandlingFee] = useState(10);
+  const [platformFee, setPlatformFee] = useState(0);
+  const [handlingFee, setHandlingFee] = useState(0);
   const [finalTotal, setFinalTotal] = useState(0);
   
   const [orderId, setOrderId] = useState(null);
@@ -112,16 +110,13 @@ function CheckoutPage() {
     const shipping = subtotal > 999 ? 0 : 60;
     setShippingFee(shipping);
     
-    const platform = 20;
+    const platform = 0;
     setPlatformFee(platform);
     
-    const gst = Math.round((subtotal + shipping + platform) * (gstPercent / 100));
-    setGstAmount(gst);
-    
-    const handling = 10;
+    const handling = 0;
     setHandlingFee(handling);
     
-    const total = subtotal + shipping + platform + gst + handling - couponDiscount;
+    const total = subtotal + shipping + platform + handling - couponDiscount;
     setFinalTotal(total);
   };
 
@@ -252,7 +247,6 @@ function CheckoutPage() {
     }
   };
 
-  // Create Order
   const createOrder = async () => {
     try {
       const token = localStorage.getItem('loop_token');
@@ -290,8 +284,6 @@ function CheckoutPage() {
         subtotal: subtotal,
         shipping: shippingFee,
         platformFee: platformFee,
-        gstPercent: gstPercent,
-        gstAmount: gstAmount,
         handlingFee: handlingFee,
         discount: couponDiscount,
         couponCode: couponCode || '',
@@ -314,7 +306,6 @@ function CheckoutPage() {
     }
   };
 
-  // Clear cart after order
   const clearCartAfterOrder = async () => {
     try {
       localStorage.removeItem('loop_cart');
@@ -329,7 +320,6 @@ function CheckoutPage() {
     }
   };
 
-  // Initiate UPI Payment
   const initiateUPIPayment = async (app) => {
     if (!selectedAddress) {
       alert('Please add a shipping address first');
@@ -380,7 +370,6 @@ function CheckoutPage() {
     }
   };
 
-  // Start Payment Verification
   const startPaymentVerification = (orderId, order) => {
     let attempts = 0;
     const maxAttempts = 30;
@@ -420,7 +409,6 @@ function CheckoutPage() {
     window.paymentPollInterval = pollInterval;
   };
 
-  // Initiate Razorpay Payment
   const initiateRazorpayPayment = async () => {
     if (!selectedAddress) {
       alert('Please add a shipping address first');
@@ -494,7 +482,6 @@ function CheckoutPage() {
     }
   };
 
-  // Verify Razorpay Payment
   const verifyRazorpayPayment = async (paymentResponse, orderId) => {
     setPaymentStatus('verifying');
     
@@ -533,7 +520,6 @@ function CheckoutPage() {
     }
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (window.paymentPollInterval) {
@@ -772,7 +758,7 @@ function CheckoutPage() {
                 <h3>💰 Order Summary</h3>
               </div>
               
-              {/* ✅ FREE SHIPPING PROGRESS - NEW FEATURE */}
+              {/* Free Shipping Progress */}
               {subtotal > 0 && subtotal < 999 && (
                 <div className="free-shipping-progress">
                   <div className="free-shipping-info">
@@ -806,31 +792,38 @@ function CheckoutPage() {
                   <span>Item Total ({cart.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
                   <span>₹{subtotal}</span>
                 </div>
+                
+                {/* Shipping Fee - FREE Badge when 0 */}
                 <div className="summary-row">
-                  <span>Shipping Fee</span>
-                  <span>₹{shippingFee}</span>
+                  <span>🚚 Shipping Fee</span>
+                  {shippingFee === 0 ? (
+                    <span className="free-badge shipping">FREE</span>
+                  ) : (
+                    <span>₹{shippingFee}</span>
+                  )}
                 </div>
+                
+                {/* Platform Fee - Always FREE */}
                 <div className="summary-row">
-                  <span>Platform Fee</span>
-                  <span>₹{platformFee}</span>
+                  <span>✨ Platform Fee</span>
+                  <span className="free-badge platform">FREE</span>
                 </div>
+                
+                {/* Handling Fee - Always FREE */}
                 <div className="summary-row">
-                  <span>GST ({gstPercent}%)</span>
-                  <span>₹{gstAmount}</span>
+                  <span>💫 Handling Fee</span>
+                  <span className="free-badge handling">FREE</span>
                 </div>
-                <div className="summary-row">
-                  <span>Handling Fee</span>
-                  <span>₹{handlingFee}</span>
-                </div>
+                
                 {couponDiscount > 0 && (
                   <div className="summary-row discount">
-                    <span>Coupon Discount</span>
+                    <span>🎟️ Coupon Discount</span>
                     <span>-₹{couponDiscount}</span>
                   </div>
                 )}
                 <div className="summary-divider"></div>
                 <div className="summary-row total">
-                  <span><strong>Total Amount</strong></span>
+                  <span><strong>💰 Total Amount</strong></span>
                   <span><strong>₹{finalTotal}</strong></span>
                 </div>
               </div>

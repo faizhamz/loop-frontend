@@ -484,7 +484,7 @@ function OrderHistory({ user, isLoggedIn }) {
                         </div>
                       </div>
 
-                      {/* ✅ EXPANDED ORDER DETAILS WITH BREAKDOWN */}
+                      {/* EXPANDED ORDER DETAILS WITH BREAKDOWN */}
                       {isExpanded && (
                         <div className="order-expanded">
                           {/* Full Items List */}
@@ -512,32 +512,40 @@ function OrderHistory({ user, isLoggedIn }) {
                             })}
                           </div>
 
-                          {/* ✅ ORDER BREAKDOWN */}
+                          {/* ✅ ORDER BREAKDOWN WITH FREE BADGES */}
                           <div className="order-breakdown">
                             <h4>💰 Order Breakdown</h4>
+                            
                             <div className="breakdown-row">
                               <span>Subtotal ({order.items?.length || 0} items)</span>
                               <span>₹{order.subtotal || 0}</span>
                             </div>
+                            
+                            {/* Shipping - Show FREE when 0 */}
                             <div className="breakdown-row">
-                              <span>Shipping Fee</span>
-                              <span>₹{order.shipping || 0}</span>
+                              <span>🚚 Shipping Fee</span>
+                              {order.shipping === 0 ? (
+                                <span className="free-badge shipping">FREE</span>
+                              ) : (
+                                <span>₹{order.shipping || 0}</span>
+                              )}
                             </div>
+                            
+                            {/* Platform Fee - Always FREE */}
                             <div className="breakdown-row">
-                              <span>Platform Fee</span>
-                              <span>₹{order.platformFee || 0}</span>
+                              <span>✨ Platform Fee</span>
+                              <span className="free-badge platform">FREE</span>
                             </div>
+                            
+                            {/* Handling Fee - Always FREE */}
                             <div className="breakdown-row">
-                              <span>GST ({order.gstPercent || 12}%)</span>
-                              <span>₹{order.gstAmount || 0}</span>
+                              <span>💫 Handling Fee</span>
+                              <span className="free-badge handling">FREE</span>
                             </div>
-                            <div className="breakdown-row">
-                              <span>Handling Fee</span>
-                              <span>₹{order.handlingFee || 0}</span>
-                            </div>
+                            
                             {order.discount > 0 && (
                               <div className="breakdown-row discount">
-                                <span>Discount</span>
+                                <span>🎟️ Coupon Discount</span>
                                 <span>-₹{order.discount}</span>
                               </div>
                             )}
@@ -549,7 +557,7 @@ function OrderHistory({ user, isLoggedIn }) {
                             )}
                             <div className="breakdown-divider"></div>
                             <div className="breakdown-row total">
-                              <span><strong>Total</strong></span>
+                              <span><strong>💰 Total</strong></span>
                               <span><strong>₹{order.total}</strong></span>
                             </div>
                           </div>

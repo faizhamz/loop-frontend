@@ -889,3 +889,64 @@
     grid-template-columns: 1fr 1fr;
   }
 }
+/* ============================================
+   FREE BADGE STYLES
+   ============================================ */
+
+.free-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: #fff;
+  padding: 2px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  animation: freeBadgePulse 2s ease-in-out infinite;
+  box-shadow: 0 2px 10px rgba(40, 167, 69, 0.2);
+}
+
+.free-badge::before {
+  content: '🎉';
+  font-size: 12px;
+  margin-right: 2px;
+}
+
+@keyframes freeBadgePulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 10px rgba(40, 167, 69, 0.2);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 4px 20px rgba(40, 167, 69, 0.4);
+  }
+}
+
+/* Different color variants */
+.free-badge.shipping {
+  background: linear-gradient(135deg, #007bff, #6610f2);
+}
+
+.free-badge.platform {
+  background: linear-gradient(135deg, #D4AF37, #FFB7C5);
+  color: #000;
+}
+
+.free-badge.handling {
+  background: linear-gradient(135deg, #fd7e14, #ff6b6b);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .free-badge {
+    font-size: 10px;
+    padding: 1px 10px;
+  }
+  
+  .free-badge::before {
+    font-size: 10px;
+  }
+}
