@@ -15,7 +15,7 @@ function CheckoutPage() {
   
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState(null);
-  const [selectedPayment, setSelectedPayment] = useState('upi');
+  const [selectedPayment, setSelectedPayment] = useState('razorpay');
   const [copied, setCopied] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [showUPIApps, setShowUPIApps] = useState(false);
@@ -252,73 +252,75 @@ function CheckoutPage() {
     }
   };
 
-const createOrder = async () => {
-  try {
-    const token = localStorage.getItem('loop_token');
-    const cart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
-    
-    if (!selectedAddress) {
-      alert('Please add a shipping address');
-      return null;
-    }
-    
-    // ✅ FIXED: Use _id instead of id
-    const orderItems = cart.map(item => ({
-      productId: item._id || item.id,  
-      name: item.name,
-      price: item.price,
-      quantity: item.quantity,
-      size: item.size || 'M',
-      color: item.color || 'Black'
-    }));
-    
-    console.log('📦 Order items with productId:', orderItems);
-    
-    const orderData = {
-      customer: {
-        name: selectedAddress.name || user?.name || 'Guest',
-        email: user?.email || 'guest@loop.in',
-        phone: selectedAddress.phone || user?.phone || '',
-        address: {
-          street: selectedAddress.street || '',
-          city: selectedAddress.city || '',
-          state: selectedAddress.state || '',
-          pincode: selectedAddress.pincode || '',
-          landmark: selectedAddress.landmark || ''
-        }
-      },
-      userId: user?._id || null,
-      items: orderItems,
-      subtotal: subtotal,
-      shipping: shippingFee,
-      platformFee: platformFee,
-      gstPercent: gstPercent,
-      gstAmount: gstAmount,
-      handlingFee: handlingFee,
-      discount: couponDiscount,
-      couponCode: couponCode || '',
-      total: finalTotal,
-      paymentMethod: 'razorpay'
-    };
-
-    console.log('📦 Creating order with data:', orderData);
-    const response = await axios.post(`${API_URL}/api/orders`, orderData, {
-      headers: { 
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
+  // ✅ FIXED: createOrder with correct productId
+  const createOrder = async () => {
+    try {
+      const token = localStorage.getItem('loop_token');
+      const cart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
+      
+      if (!selectedAddress) {
+        alert('Please add a shipping address');
+        return null;
       }
-    });
-    
-    console.log('✅ Order created:', response.data);
-    return response.data;
-    
-  } catch (err) {
-    console.error('Error creating order:', err);
-    console.error('Response data:', err.response?.data);
-    console.error('Status:', err.response?.status);
-    throw err;
-  }
-};
+      
+      // ✅ IMPORTANT: Map cart items to use productId
+      const orderItems = cart.map(item => ({
+        productId: item._id || item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        size: item.size || 'M',
+        color: item.color || 'Black'
+      }));
+      
+      console.log('📦 Order items:', orderItems);
+      
+      const orderData = {
+        customer: {
+          name: selectedAddress.name || user?.name || 'Guest',
+          email: user?.email || 'guest@loop.in',
+          phone: selectedAddress.phone || user?.phone || '',
+          address: {
+            street: selectedAddress.street || '',
+            city: selectedAddress.city || '',
+            state: selectedAddress.state || '',
+            pincode: selectedAddress.pincode || '',
+            landmark: selectedAddress.landmark || ''
+          }
+        },
+        userId: user?._id || null,
+        items: orderItems,
+        subtotal: subtotal,
+        shipping: shippingFee,
+        platformFee: platformFee,
+        gstPercent: gstPercent,
+        gstAmount: gstAmount,
+        handlingFee: handlingFee,
+        discount: couponDiscount,
+        couponCode: couponCode || '',
+        total: finalTotal,
+        paymentMethod: 'razorpay'
+      };
+
+      console.log('📦 Creating order with data:', orderData);
+
+      const response = await axios.post(`${API_URL}/api/orders`, orderData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('✅ Order created:', response.data);
+      return response.data;
+      
+    } catch (err) {
+      console.error('Error creating order:', err);
+      console.error('Response data:', err.response?.data);
+      console.error('Status:', err.response?.status);
+      throw err;
+    }
+  };
 
   // Clear cart after order
   const clearCartAfterOrder = async () => {
@@ -426,7 +428,7 @@ const createOrder = async () => {
     window.paymentPollInterval = pollInterval;
   };
 
-  // Initiate Razorpay Payment
+  // ✅ Initiate Razorpay Payment - FIXED
   const initiateRazorpayPayment = async () => {
     if (!selectedAddress) {
       alert('Please add a shipping address first');
@@ -440,6 +442,7 @@ const createOrder = async () => {
     setShowSupport(false);
     
     try {
+      // 1. Create order
       const order = await createOrder();
       if (!order) {
         setProcessing(false);
@@ -448,6 +451,7 @@ const createOrder = async () => {
       
       setOrderId(order.orderId);
       
+      // 2. Get Razorpay order
       const token = localStorage.getItem('loop_token');
       const response = await axios.post(`${API_URL}/api/create-razorpay-order`, {
         amount: finalTotal,
@@ -458,6 +462,11 @@ const createOrder = async () => {
       
       const razorpayOrder = response.data;
       
+      // Log for debugging
+      console.log('Razorpay Key:', process.env.REACT_APP_RAZORPAY_KEY_ID);
+      console.log('Razorpay Order:', razorpayOrder);
+      
+      // 3. Open Razorpay Checkout
       const options = {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID,
         amount: razorpayOrder.amount,
