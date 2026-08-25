@@ -10,6 +10,7 @@
     "react": "^18.2.0",
     "react-countup": "^6.5.3",
     "react-dom": "^18.2.0",
+    "react-helmet-async": "^2.0.5",
     "react-hook-form": "^7.85.0",
     "react-intersection-observer": "^11.0.0",
     "react-router-dom": "^6.30.4",

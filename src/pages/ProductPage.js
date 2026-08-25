@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Helmet } from 'react-helmet-async';
 import axios from 'axios';
 import RatingStars from '../components/RatingStars';
 import ReviewModal from '../components/ReviewModal';
@@ -891,8 +892,67 @@ function ProductPage({
     ? product.variants.find(v => v.type === 'Color' || v.name === 'Color')?.options.map(o => o.value) || []
     : [product.color || 'Black'];
 
+  // ✅ Build Schema.org JSON-LD
+  const productSchema = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": product.name,
+    "image": product.image || product.images?.[0] || '',
+    "description": product.description || `Buy ${product.name} online at LOOP.`,
+    "sku": product.productId,
+    "brand": {
+      "@type": "Brand",
+      "name": "LOOP"
+    },
+    "offers": {
+      "@type": "Offer",
+      "priceCurrency": "INR",
+      "price": hasSale ? product.salePrice : product.price,
+      "availability": product.stock > 0 ? 
+        "https://schema.org/InStock" : 
+        "https://schema.org/OutOfStock"
+    }
+  };
+
+  // Add aggregate rating if available
+  if (product.avgRating > 0 && product.reviewCount > 0) {
+    productSchema.aggregateRating = {
+      "@type": "AggregateRating",
+      "ratingValue": product.avgRating,
+      "reviewCount": product.reviewCount
+    };
+  }
+
   return (
     <div className="product-page">
+      {/* ✅ META TAGS + SCHEMA */}
+      <Helmet>
+        <title>{product.name} | LOOP - Premium Fashion</title>
+        <meta name="description" content={`Buy ${product.name} online at LOOP. ₹${product.price}. ${product.description?.slice(0, 150) || 'Premium quality product with free delivery on orders above ₹999.'}`} />
+        <meta name="keywords" content={`${product.name}, loop, fashion, ${product.category}, ${product.color || ''}, ${product.size || ''}, clothing`} />
+        <link rel="canonical" href={`https://loopstore.in/product/${product.productId}`} />
+        
+        {/* Open Graph */}
+        <meta property="og:title" content={`${product.name} | LOOP`} />
+        <meta property="og:description" content={`Buy ${product.name} at LOOP. ₹${product.price}. Free delivery on orders above ₹999.`} />
+        <meta property="og:image" content={product.image || product.images?.[0] || ''} />
+        <meta property="og:url" content={`https://loopstore.in/product/${product.productId}`} />
+        <meta property="og:type" content="product" />
+        <meta property="og:price:amount" content={hasSale ? product.salePrice : product.price} />
+        <meta property="og:price:currency" content="INR" />
+        
+        {/* Twitter Cards */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${product.name} | LOOP`} />
+        <meta name="twitter:description" content={`Buy ${product.name} at LOOP. ₹${product.price}.`} />
+        <meta name="twitter:image" content={product.image || product.images?.[0] || ''} />
+        
+        {/* ✅ Schema.org JSON-LD */}
+        <script type="application/ld+json">
+          {JSON.stringify(productSchema)}
+        </script>
+      </Helmet>
+
       {/* Toast Notification */}
       <motion.div 
         className={`toast-notification ${showToast ? 'show' : ''} ${toastType}`}

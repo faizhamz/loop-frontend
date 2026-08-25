@@ -1,6 +1,7 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Helmet } from 'react-helmet-async';
 import './App.css';
 import './pages/OrderHistory.css';
 import { AppProvider, useApp } from './context/AppContext';
@@ -326,6 +327,21 @@ function AppContent() {
 
   return (
     <div className={`App ${isDarkMode ? 'dark-theme' : 'light-theme'}`}>
+      {/* ✅ DEFAULT META TAGS */}
+      <Helmet>
+        <title>LOOP - Make Your Move | Premium Fashion</title>
+        <meta name="description" content="Shop premium fashion at LOOP. Free delivery on orders above ₹999. 14-day return policy. Best quality fabrics." />
+        <meta name="keywords" content="fashion, clothing, premium, loop, style, trends, kawaii" />
+        <link rel="canonical" href="https://loopstore.in/" />
+        <meta property="og:title" content="LOOP - Make Your Move" />
+        <meta property="og:description" content="Shop premium fashion at LOOP. Free delivery on orders above ₹999. 14-day return policy." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://loopstore.in/" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="LOOP - Make Your Move" />
+        <meta name="twitter:description" content="Shop premium fashion at LOOP. Free delivery on orders above ₹999." />
+      </Helmet>
+
       {/* Toast Notification */}
       <GlobalToast 
         show={toast.show} 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Helmet } from 'react-helmet-async';
 import { useInView } from 'react-intersection-observer';
 import BannerCarousel from '../components/BannerCarousel';
 import CountUp from 'react-countup';
@@ -165,6 +166,35 @@ function HomePage({
 
   return (
     <div className="App">
+      {/* ✅ META TAGS FOR HOMEPAGE */}
+      <Helmet>
+        <title>LOOP - Make Your Move | Premium Fashion Store</title>
+        <meta name="description" content="Shop the latest premium fashion at LOOP. Free delivery on orders above ₹999. 14-day return policy. Best quality fabrics and unique styles." />
+        <meta name="keywords" content="fashion, clothing, premium, loop, style, trends, kawaii, online shopping, India" />
+        <link rel="canonical" href="https://loopstore.in/" />
+        <meta property="og:title" content="LOOP - Make Your Move | Premium Fashion" />
+        <meta property="og:description" content="Shop premium fashion at LOOP. Free delivery on orders above ₹999. 14-day return policy." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://loopstore.in/" />
+        <meta property="og:image" content="https://loopstore.in/og-image.jpg" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="LOOP - Make Your Move" />
+        <meta name="twitter:description" content="Shop premium fashion at LOOP. Free delivery on orders above ₹999." />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "LOOP",
+            "url": "https://loopstore.in/",
+            "potentialAction": {
+              "@type": "SearchAction",
+              "target": "https://loopstore.in/search?q={search_term_string}",
+              "query-input": "required name=search_term_string"
+            }
+          })}
+        </script>
+      </Helmet>
+
       {/* ✅ HERO SECTION - ORIGINAL */}
       <motion.section 
         className="hero hero-homepage"
@@ -369,6 +399,9 @@ function HomePage({
                         >
                           -{discountPercent}%
                         </motion.span>
+                      )}
+                      {product.avgRating >= 4 && (
+                        <span className="top-rated-badge">⭐ Top Rated</span>
                       )}
                       <motion.button 
                         className={`wishlist-btn-card ${inWishlist ? 'active' : ''}`}

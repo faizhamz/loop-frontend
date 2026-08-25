@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /login/
+Disallow: /signup/
+Disallow: /profile/
+Disallow: /orders/
+Disallow: /api/
+Sitemap: https://loopstore.in/sitemap.xml

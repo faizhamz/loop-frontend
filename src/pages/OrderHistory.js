@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import ReviewModal from '../components/ReviewModal';
 import './OrderHistory.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
@@ -20,6 +21,9 @@ function OrderHistory({ user, isLoggedIn }) {
   const [ratingComment, setRatingComment] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [contactLoading, setContactLoading] = useState(true);
+  
+  // ✅ Review Modal State
+  const [reviewModal, setReviewModal] = useState(null);
 
   // Fetch WhatsApp number
   useEffect(() => {
@@ -154,6 +158,23 @@ function OrderHistory({ user, isLoggedIn }) {
     const cleanNumber = whatsappNumber.replace(/\D/g, '');
     const message = `Hi LOOP Team, I need help with my order #${orderId || ''}`;
     window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  // ✅ Open Review Modal
+  const openReviewModal = (order) => {
+    // Find first un-reviewed item
+    const unReviewedItem = order.items?.find(item => !item.isReviewed);
+    if (unReviewedItem) {
+      setReviewModal({
+        orderId: order._id,
+        orderItemId: unReviewedItem._id,
+        productId: unReviewedItem.productId?._id || unReviewedItem.productId,
+        productName: unReviewedItem.name,
+        productImage: unReviewedItem.productId?.image || ''
+      });
+    } else {
+      alert('All items in this order have been reviewed already!');
+    }
   };
 
   const submitRating = async () => {
@@ -431,7 +452,7 @@ function OrderHistory({ user, isLoggedIn }) {
                         )}
                       </div>
 
-                      {/* ✅ ORDER FOOTER - CANCEL BUTTON REMOVED */}
+                      {/* ✅ ORDER FOOTER - WITH REVIEW BUTTON */}
                       <div className="order-footer">
                         <div className="order-total">
                           <span className="total-label">Total:</span>
@@ -458,6 +479,16 @@ function OrderHistory({ user, isLoggedIn }) {
                               >
                                 ⭐ Rate
                               </button>
+                              {/* ✅ Write Review Button - Only if there are un-reviewed items */}
+                              {order.items?.some(item => !item.isReviewed) && (
+                                <button 
+                                  className="order-action-btn rate"
+                                  onClick={() => openReviewModal(order)}
+                                  style={{ background: '#D4AF37', color: '#000', border: 'none' }}
+                                >
+                                  ✏️ Write Review
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
@@ -484,6 +515,11 @@ function OrderHistory({ user, isLoggedIn }) {
                                     <span className="item-full-details">
                                       Size: {item.size || 'N/A'} × {item.quantity}
                                     </span>
+                                    {item.isReviewed && (
+                                      <span className="reviewed-badge" style={{ color: '#28a745', fontSize: '12px' }}>
+                                        ✅ Reviewed
+                                      </span>
+                                    )}
                                   </div>
                                   <span className="item-full-price">₹{item.price * item.quantity}</span>
                                 </div>
@@ -652,6 +688,22 @@ function OrderHistory({ user, isLoggedIn }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ✅ Review Modal */}
+      {reviewModal && (
+        <ReviewModal 
+          isOpen={!!reviewModal}
+          onClose={() => setReviewModal(null)}
+          productId={reviewModal.productId}
+          productName={reviewModal.productName}
+          orderId={reviewModal.orderId}
+          orderItemId={reviewModal.orderItemId}
+          onReviewSubmitted={() => {
+            setReviewModal(null);
+            fetchOrders();
+          }}
+        />
       )}
     </div>
   );
