@@ -76,7 +76,6 @@ function Hero3D() {
   const mobileRotateX = deviceOrientation.beta || 0;
   const mobileRotateY = deviceOrientation.gamma || 0;
 
-  // Glare effect on desktop
   const glareOpacity = isHovered && !isMobile ? 1 : 0;
 
   return (
