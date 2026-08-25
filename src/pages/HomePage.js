@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Tilt from 'react-tilt';  // ✅ This should work for v1
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 
 function Hero3D() {
