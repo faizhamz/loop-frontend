@@ -6,6 +6,12 @@ import './App.css';
 import './pages/OrderHistory.css';
 import App from './App';
 import { BrowserRouter } from 'react-router-dom';
+import { initMetaPixel } from './utils/metaPixel';
+import { initGA } from './utils/googleAnalytics';
+
+// ✅ Initialize Tracking
+initMetaPixel();
+initGA();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

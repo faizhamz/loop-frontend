@@ -11,8 +11,10 @@ import NotificationsPanel from './NotificationsPanel';
 import ReferralPanel from './ReferralPanel';
 import CategoriesPanel from './CategoriesPanel';
 import AnalyticsPanel from './AnalyticsPanel';
+import MarketingPanel from './MarketingPanel';  // ✅ NEW
 import axios from 'axios';
 import './Admin.css';
+import './MarketingPanel.css';  // ✅ NEW
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
@@ -198,6 +200,10 @@ function AdminDashboard() {
           <button className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>
             📈 Analytics
           </button>
+          {/* ✅ NEW: Marketing Button */}
+          <button className={activeTab === 'marketing' ? 'active' : ''} onClick={() => setActiveTab('marketing')}>
+            📊 Marketing
+          </button>
         </nav>
         <button className="logout-btn" onClick={handleLogout}>🚪 Logout</button>
       </div>
@@ -231,6 +237,8 @@ function AdminDashboard() {
         {activeTab === 'referral' && <ReferralPanel />}
         {activeTab === 'categories' && <CategoriesPanel />}
         {activeTab === 'analytics' && <AnalyticsPanel />}
+        {/* ✅ NEW: Marketing Panel */}
+        {activeTab === 'marketing' && <MarketingPanel />}
       </div>
     </div>
   );

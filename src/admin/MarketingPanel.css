@@ -1,0 +1,643 @@
+/* Marketing Panel Styles */
+.marketing-panel {
+  padding: 20px;
+  color: #fff;
+}
+
+.marketing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.marketing-header h2 {
+  color: #D4AF37;
+  font-size: 24px;
+  margin: 0;
+}
+
+.marketing-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.date-range-select {
+  padding: 8px 16px;
+  background: #222;
+  border: 1px solid #333;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.date-range-select:focus {
+  outline: none;
+  border-color: #D4AF37;
+}
+
+.refresh-btn {
+  padding: 8px 16px;
+  background: #D4AF37;
+  border: none;
+  border-radius: 6px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.refresh-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+}
+
+/* Stats Grid */
+.marketing-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.marketing-stat {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: #111;
+  border-radius: 12px;
+  border: 1px solid #222;
+  transition: all 0.3s;
+}
+
+.marketing-stat:hover {
+  border-color: #D4AF37;
+  transform: translateY(-2px);
+}
+
+.stat-icon {
+  font-size: 32px;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(212, 175, 55, 0.1);
+  border-radius: 50%;
+}
+
+.stat-content h3 {
+  font-size: 24px;
+  color: #D4AF37;
+  margin: 0;
+}
+
+.stat-content p {
+  margin: 0;
+  color: #888;
+  font-size: 13px;
+}
+
+.stat-change {
+  font-size: 12px;
+  color: #28a745;
+}
+
+/* Marketing Sections */
+.marketing-section {
+  background: #111;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #222;
+}
+
+.marketing-section h3 {
+  color: #D4AF37;
+  font-size: 16px;
+  margin: 0 0 16px 0;
+}
+
+/* Traffic Sources */
+.traffic-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.source-icon {
+  font-size: 20px;
+  width: 30px;
+}
+
+.source-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  min-width: 120px;
+}
+
+.source-name {
+  color: #ccc;
+  font-size: 14px;
+}
+
+.source-value {
+  color: #D4AF37;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.source-bar {
+  flex: 2;
+  height: 6px;
+  background: #222;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.source-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+/* Campaign Table */
+.campaign-table-wrapper {
+  overflow-x: auto;
+}
+
+.campaign-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.campaign-table th {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 2px solid #333;
+  color: #D4AF37;
+  font-weight: 600;
+}
+
+.campaign-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #222;
+}
+
+.campaign-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.campaign-table tr.high-roi td:last-child {
+  color: #28a745;
+}
+
+.campaign-table tr.medium-roi td:last-child {
+  color: #D4AF37;
+}
+
+.campaign-table tr.low-roi td:last-child {
+  color: #ff4444;
+}
+
+.platform-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.platform-badge.facebook {
+  background: rgba(24, 119, 242, 0.15);
+  color: #1877F2;
+}
+
+.platform-badge.instagram {
+  background: rgba(228, 64, 95, 0.15);
+  color: #E4405F;
+}
+
+.platform-badge.google {
+  background: rgba(52, 168, 83, 0.15);
+  color: #34A853;
+}
+
+.roi-badge {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.roi-badge.positive {
+  background: rgba(40, 167, 69, 0.15);
+  color: #28a745;
+}
+
+.roi-badge.neutral {
+  background: rgba(212, 175, 55, 0.15);
+  color: #D4AF37;
+}
+
+.roi-badge.negative {
+  background: rgba(255, 68, 68, 0.15);
+  color: #ff4444;
+}
+
+/* Pixel Events */
+.pixel-events {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pixel-event {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.event-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  min-width: 160px;
+}
+
+.event-name {
+  color: #ccc;
+  font-size: 14px;
+}
+
+.event-count {
+  color: #888;
+  font-size: 13px;
+}
+
+.event-bar {
+  flex: 2;
+  height: 6px;
+  background: #222;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.event-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #D4AF37, #FFB7C5);
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.event-percentage {
+  color: #D4AF37;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Top Products */
+.top-products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.top-product-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.top-product-item:hover {
+  background: #222;
+}
+
+.product-rank {
+  font-size: 14px;
+  font-weight: 700;
+  color: #D4AF37;
+  min-width: 30px;
+}
+
+.top-product-item img {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.product-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-name {
+  color: #fff;
+  font-size: 14px;
+}
+
+.product-sales {
+  color: #888;
+  font-size: 12px;
+}
+
+.product-revenue {
+  color: #D4AF37;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Marketing Actions */
+.marketing-actions {
+  background: #111;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #222;
+}
+
+.marketing-actions h3 {
+  color: #D4AF37;
+  font-size: 16px;
+  margin: 0 0 16px 0;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.action-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 13px;
+}
+
+.action-btn:hover {
+  transform: scale(1.02);
+}
+
+.action-btn.primary {
+  background: #D4AF37;
+  color: #000;
+}
+
+.action-btn.primary:hover {
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+}
+
+.action-btn.secondary {
+  background: #333;
+  color: #fff;
+}
+
+.action-btn.secondary:hover {
+  background: #444;
+}
+
+.action-btn.success {
+  background: #28a745;
+  color: #fff;
+}
+
+.action-btn.success:hover {
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.action-btn.warning {
+  background: #ff8800;
+  color: #fff;
+}
+
+.action-btn.warning:hover {
+  box-shadow: 0 4px 15px rgba(255, 136, 0, 0.3);
+}
+
+/* Pixel Instructions */
+.pixel-instructions {
+  border-color: rgba(212, 175, 55, 0.2);
+}
+
+.pixel-code {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.pixel-code p {
+  margin: 0;
+  color: #ccc;
+}
+
+.pixel-id {
+  background: #222;
+  padding: 4px 12px;
+  border-radius: 4px;
+  color: #D4AF37;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.copy-btn {
+  padding: 4px 12px;
+  background: #D4AF37;
+  border: none;
+  border-radius: 4px;
+  color: #000;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.copy-btn:hover {
+  transform: scale(1.05);
+}
+
+.pixel-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(40, 167, 69, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.active {
+  background: #28a745;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Loading */
+.marketing-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+}
+
+.marketing-loading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #333;
+  border-top: 3px solid #D4AF37;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.marketing-loading p {
+  color: #888;
+  margin-top: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .marketing-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .marketing-controls {
+    flex-wrap: wrap;
+  }
+  
+  .marketing-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .campaign-table {
+    font-size: 11px;
+  }
+  
+  .campaign-table th,
+  .campaign-table td {
+    padding: 6px 8px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .action-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .marketing-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .source-item {
+    flex-wrap: wrap;
+  }
+  
+  .source-bar {
+    flex: 1 1 100%;
+  }
+  
+  .pixel-code {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+/* Error State */
+.marketing-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 68, 68, 0.1);
+  border: 1px solid rgba(255, 68, 68, 0.2);
+  border-radius: 8px;
+  color: #ff4444;
+  margin-bottom: 16px;
+}
+
+.marketing-error button {
+  background: #ff4444;
+  border: none;
+  padding: 4px 16px;
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.marketing-error button:hover {
+  background: #cc0000;
+}
+
+/* Additional Action Buttons */
+.action-btn.info {
+  background: #0066FF;
+  color: #fff;
+}
+
+.action-btn.info:hover {
+  box-shadow: 0 4px 15px rgba(0, 102, 255, 0.3);
+}
+
+/* Status Dot Inactive */
+.status-dot.inactive {
+  background: #ff4444;
+  animation: none;
+}
+
+/* Campaign Table Empty State */
+.campaign-table td[colspan] {
+  color: #666;
+  font-style: italic;
+}
