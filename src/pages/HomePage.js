@@ -5,6 +5,7 @@ import { useInView } from 'react-intersection-observer';
 import BannerCarousel from '../components/BannerCarousel';
 import CountUp from 'react-countup';
 import CategoryCard from '../components/CategoryCard';
+import Hero3D from '../components/Hero3D';
 import axios from 'axios';
 import './HomePage.css';
 
@@ -165,7 +166,7 @@ function HomePage({
 
   return (
     <div className="App">
-      {/* HERO WITH BIG CENTERED LOGO */}
+      {/* ✅ HERO WITH 3D COMBINED EFFECT */}
       <motion.section 
         className="hero hero-homepage"
         initial={{ opacity: 0 }}
@@ -179,15 +180,9 @@ function HomePage({
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
           >
-            <motion.div 
-              className="hero-logo-big"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.3 }}
-            >
-              <span className="hero-l-big">L</span>
-              <span className="hero-infinity-big">∞</span>
-              <span className="hero-p-big">P</span>
-            </motion.div>
+            {/* ✅ 3D Combined Hero Component */}
+            <Hero3D />
+
             <motion.p 
               className="hero-tagline"
               initial={{ opacity: 0, y: 20 }}
@@ -196,6 +191,7 @@ function HomePage({
             >
               MAKE YOUR MOVE
             </motion.p>
+
             <motion.button 
               className="cta-button"
               initial={{ opacity: 0, y: 20 }}
@@ -331,7 +327,6 @@ function HomePage({
               viewport={{ once: true, amount: 0.1 }}
             >
               {(products || []).map((product, index) => {
-                // ✅ Skip if product is undefined
                 if (!product) return null;
                 
                 const hasSale = product.salePrice && product.salePrice < product.price;
