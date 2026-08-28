@@ -562,8 +562,10 @@ function AppContent() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Recently Viewed Section */}
-      <RecentlyViewed />
+      {/* Recently Viewed Section - Hide on Checkout, Order Confirmation, Login, Signup, Profile */}
+{!['/checkout', '/order-confirmation', '/login', '/signup', '/profile'].includes(location.pathname) && (
+  <RecentlyViewed />
+)}
 
       {/* Cart Sidebar */}
       {showCart && (
