@@ -110,14 +110,18 @@ export function AppProvider({ children }) {
 
   // ✅ Remove single item from recently viewed
   const removeFromRecentlyViewed = (productId) => {
-    if (!productId) return;
-    
-    setRecentlyViewed(prev => {
-      const updated = prev.filter(item => item._id !== productId);
-      localStorage.setItem('loop_recently_viewed', JSON.stringify(updated));
-      return updated;
+  if (!productId) return;
+  
+  setRecentlyViewed(prev => {
+    const updated = prev.filter(item => {
+      // Try multiple ID fields
+      const itemId = item._id || item.id || item.productId;
+      return itemId !== productId;
     });
-  };
+    localStorage.setItem('loop_recently_viewed', JSON.stringify(updated));
+    return updated;
+  });
+};
 
   // ✅ Clear all recently viewed
   const clearRecentlyViewed = () => {

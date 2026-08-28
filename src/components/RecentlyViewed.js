@@ -5,7 +5,6 @@ import { useApp } from '../context/AppContext';
 import RatingStars from './RatingStars';
 
 function RecentlyViewed({ addToCart }) {
-  // ✅ Add removeFromRecentlyViewed to the destructuring
   const { recentlyViewed, clearRecentlyViewed, removeFromRecentlyViewed } = useApp();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const scrollContainerRef = useRef(null);
@@ -38,14 +37,23 @@ function RecentlyViewed({ addToCart }) {
     }
   };
 
-  // ✅ Add this function - handles removing a single item
-  const handleRemoveItem = (productId, e) => {
+  // ✅ UPDATED: Handle removing a single item with proper ID detection
+  const handleRemoveItem = (product, e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (removeFromRecentlyViewed) {
-      removeFromRecentlyViewed(productId);
+    
+    // Try multiple ID field names
+    const productId = product._id || product.id || product.productId;
+    
+    if (productId) {
+      console.log('🗑️ Removing item:', productId, product.name);
+      if (removeFromRecentlyViewed) {
+        removeFromRecentlyViewed(productId);
+      } else {
+        console.warn('⚠️ removeFromRecentlyViewed function not available');
+      }
     } else {
-      console.warn('⚠️ removeFromRecentlyViewed function not available');
+      console.error('❌ Cannot remove: No product ID found', product);
     }
   };
 
@@ -99,13 +107,14 @@ function RecentlyViewed({ addToCart }) {
             transition={{ duration: 0.5 }}
           >
             {recentlyViewed.slice(0, 6).map((product, index) => {
-              const productSlug = product.productId || product._id;
+              const productSlug = product.productId || product._id || product.id;
               const hasSale = product.salePrice && product.salePrice < product.price;
               const displayPrice = hasSale ? product.salePrice : product.price;
+              const productId = product._id || product.id || product.productId;
 
               return (
                 <motion.div
-                  key={product._id || index}
+                  key={productId || index}
                   className="recently-viewed-item"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -113,10 +122,10 @@ function RecentlyViewed({ addToCart }) {
                   whileHover={{ y: -4, scale: 1.02 }}
                   onClick={() => navigate(`/product/${productSlug}`)}
                 >
-                  {/* ✅ DELETE BUTTON - ADD THIS */}
+                  {/* ✅ DELETE BUTTON */}
                   <button 
                     className="recent-remove-btn"
-                    onClick={(e) => handleRemoveItem(product._id, e)}
+                    onClick={(e) => handleRemoveItem(product, e)}
                     title="Remove from recently viewed"
                   >
                     ✕
@@ -203,13 +212,14 @@ function RecentlyViewed({ addToCart }) {
           
           <div className="recently-viewed-scroll" ref={scrollContainerRef}>
             {recentlyViewed.map((product, index) => {
-              const productSlug = product.productId || product._id;
+              const productSlug = product.productId || product._id || product.id;
               const hasSale = product.salePrice && product.salePrice < product.price;
               const displayPrice = hasSale ? product.salePrice : product.price;
+              const productId = product._id || product.id || product.productId;
 
               return (
                 <motion.div
-                  key={product._id || index}
+                  key={productId || index}
                   className="recently-viewed-item carousel-item"
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -217,10 +227,10 @@ function RecentlyViewed({ addToCart }) {
                   whileHover={{ y: -4, scale: 1.02 }}
                   onClick={() => navigate(`/product/${productSlug}`)}
                 >
-                  {/* ✅ DELETE BUTTON - ADD THIS */}
+                  {/* ✅ DELETE BUTTON */}
                   <button 
                     className="recent-remove-btn"
-                    onClick={(e) => handleRemoveItem(product._id, e)}
+                    onClick={(e) => handleRemoveItem(product, e)}
                     title="Remove from recently viewed"
                   >
                     ✕
