@@ -256,10 +256,18 @@ function AppContent() {
     }
   };
 
-  // ✅ FIXED: Add to cart with proper localStorage sync
+  // ✅ Helper function to get product ID from any cart item
+  const getProductId = (item) => {
+    return item?.id || item?._id || item?.productId || null;
+  };
+
+  // ✅ FIXED: Add to cart with proper localStorage sync and ID handling
   const addToCart = async (product, selectedSize, quantity = 1) => {
-    if (!product || !product._id) {
-      console.error('❌ Cannot add: Invalid product');
+    // Try multiple ID field names
+    const productId = product?._id || product?.id || product?.productId;
+    
+    if (!productId) {
+      console.error('❌ Cannot add: Invalid product', product);
       return;
     }
     
@@ -267,7 +275,11 @@ function AppContent() {
     const size = selectedSize || 'M';
     
     setCart(prevCart => {
-      const existingIndex = prevCart.findIndex(item => item.id === product._id && item.size === size);
+      const existingIndex = prevCart.findIndex(item => {
+        const itemId = getProductId(item);
+        return itemId === productId && item.size === size;
+      });
+      
       let updatedCart;
       
       if (existingIndex > -1) {
@@ -278,7 +290,8 @@ function AppContent() {
         );
       } else {
         updatedCart = [...prevCart, { 
-          id: product._id, 
+          id: productId,
+          _id: productId,
           name: product.name, 
           price: displayPrice,
           originalPrice: product.price,
@@ -301,19 +314,34 @@ function AppContent() {
     });
   };
 
-  // ✅ FIXED: Remove from cart with proper localStorage sync
+  // ✅ FIXED: Remove from cart with multiple ID support
   const removeFromCart = (id, size) => {
-    if (!id) {
+    // If id is an object, extract the ID
+    let productId = id;
+    let itemSize = size;
+    
+    if (typeof id === 'object' && id !== null) {
+      productId = getProductId(id);
+      itemSize = id.size || size;
+    }
+    
+    if (!productId) {
       console.warn('⚠️ Cannot remove: No product ID provided', { id, size });
       return;
     }
     
     setCart(prevCart => {
       let updatedCart;
-      if (size) {
-        updatedCart = prevCart.filter(item => !(item.id === id && item.size === size));
+      if (itemSize) {
+        updatedCart = prevCart.filter(item => {
+          const itemId = getProductId(item);
+          return !(itemId === productId && item.size === itemSize);
+        });
       } else {
-        updatedCart = prevCart.filter(item => item.id !== id);
+        updatedCart = prevCart.filter(item => {
+          const itemId = getProductId(item);
+          return itemId !== productId;
+        });
       }
       
       // ✅ Update localStorage
@@ -328,30 +356,45 @@ function AppContent() {
     });
   };
 
-  // ✅ FIXED: Update quantity with proper localStorage sync
+  // ✅ FIXED: Update quantity with multiple ID support
   const updateQuantity = (id, newQty, size) => {
-    if (!id) {
+    // If id is an object, extract the ID
+    let productId = id;
+    let itemSize = size;
+    
+    if (typeof id === 'object' && id !== null) {
+      productId = getProductId(id);
+      itemSize = id.size || size;
+    }
+    
+    if (!productId) {
       console.warn('⚠️ Cannot update: No product ID provided', { id, newQty, size });
       return;
     }
     
     if (newQty < 1) {
-      removeFromCart(id, size);
+      removeFromCart(productId, itemSize);
       return;
     }
     
     setCart(prevCart => {
       let updatedCart;
-      if (size) {
-        updatedCart = prevCart.map(item => 
-          item.id === id && item.size === size 
-            ? { ...item, quantity: newQty } 
-            : item
-        );
+      if (itemSize) {
+        updatedCart = prevCart.map(item => {
+          const itemId = getProductId(item);
+          if (itemId === productId && item.size === itemSize) {
+            return { ...item, quantity: newQty };
+          }
+          return item;
+        });
       } else {
-        updatedCart = prevCart.map(item => 
-          item.id === id ? { ...item, quantity: newQty } : item
-        );
+        updatedCart = prevCart.map(item => {
+          const itemId = getProductId(item);
+          if (itemId === productId) {
+            return { ...item, quantity: newQty };
+          }
+          return item;
+        });
       }
       
       // ✅ Update localStorage
@@ -578,23 +621,26 @@ function AppContent() {
             {cart.length === 0 ? (
               <p className="empty-cart">Your cart is empty</p>
             ) : (
-              cart.map(item => (
-                <div key={`${item.id}-${item.size || 'M'}`} className="cart-item">
-                  <div className="cart-item-info">
-                    <p className="cart-item-name">
-                      {item.name} 
-                      <span className="cart-item-size"> ({item.size || 'M'})</span>
-                    </p>
-                    <p className="cart-item-price">₹{item.price}</p>
+              cart.map(item => {
+                const itemId = getProductId(item);
+                return (
+                  <div key={`${itemId}-${item.size || 'M'}`} className="cart-item">
+                    <div className="cart-item-info">
+                      <p className="cart-item-name">
+                        {item.name} 
+                        <span className="cart-item-size"> ({item.size || 'M'})</span>
+                      </p>
+                      <p className="cart-item-price">₹{item.price}</p>
+                    </div>
+                    <div className="cart-item-actions">
+                      <button onClick={() => updateQuantity(item, item.quantity - 1, item.size)}>-</button>
+                      <span>{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item, item.quantity + 1, item.size)}>+</button>
+                      <button className="remove-item" onClick={() => removeFromCart(item, item.size)}>🗑</button>
+                    </div>
                   </div>
-                  <div className="cart-item-actions">
-                    <button onClick={() => updateQuantity(item.id, item.quantity - 1, item.size)}>-</button>
-                    <span>{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.id, item.quantity + 1, item.size)}>+</button>
-                    <button className="remove-item" onClick={() => removeFromCart(item.id, item.size)}>🗑</button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
           {cart.length > 0 && (
