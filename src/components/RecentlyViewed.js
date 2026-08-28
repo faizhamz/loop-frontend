@@ -27,11 +27,24 @@ function RecentlyViewed({ addToCart }) {
     return `${days}d ago`;
   };
 
+  // ✅ FIXED: Handle quick add with proper ID detection
   const handleQuickAdd = (product, e) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    if (!product) {
+      console.warn('⚠️ No product to add');
+      return;
+    }
+    
+    // ✅ Make sure product has _id
+    const productToAdd = {
+      ...product,
+      _id: product._id || product.id || product.productId
+    };
+    
     if (addToCart) {
-      addToCart(product);
+      addToCart(productToAdd);
     } else {
       console.warn('⚠️ addToCart function not available');
     }
