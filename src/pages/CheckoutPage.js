@@ -16,10 +16,7 @@ function CheckoutPage() {
   
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState(null);
-  const [selectedPayment, setSelectedPayment] = useState('razorpay');
-  const [copied, setCopied] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('pending');
-  const [showUPIApps, setShowUPIApps] = useState(false);
   const [pollAttempts, setPollAttempts] = useState(0);
   
   // Coupon State
@@ -59,15 +56,6 @@ function CheckoutPage() {
   
   const [orderId, setOrderId] = useState(null);
   const [showSupport, setShowSupport] = useState(false);
-  
-  // UPI Apps
-  const upiApps = [
-    { id: 'gpay', name: 'Google Pay', icon: '📱', scheme: 'gpay://upi/pay?', color: '#4285F4' },
-    { id: 'phonepe', name: 'PhonePe', icon: '📱', scheme: 'phonepe://upi/pay?', color: '#5F259F' },
-    { id: 'paytm', name: 'Paytm', icon: '📱', scheme: 'paytmmp://upi/pay?', color: '#00BAF2' },
-    { id: 'bhim', name: 'BHIM UPI', icon: '📱', scheme: 'bhim://upi/pay?', color: '#00838F' },
-    { id: 'other', name: 'Other UPI App', icon: '📱', scheme: 'upi://pay?', color: '#666' }
-  ];
 
   // Load cart and user data
   useEffect(() => {
@@ -240,14 +228,6 @@ function CheckoutPage() {
     }
   };
 
-  const copyUPI = () => {
-    if (paymentMethod?.upiId) {
-      navigator.clipboard.writeText(paymentMethod.upiId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    }
-  };
-
   const createOrder = async () => {
     try {
       const token = localStorage.getItem('loop_token');
@@ -320,192 +300,77 @@ function CheckoutPage() {
     }
   };
 
- const initiateUPIPayment = async (app) => {
-  if (!selectedAddress) {
-    alert('Please add a shipping address first');
-    return;
-  }
-  
-  setProcessing(true);
-  setPaymentStatus('pending');
-  setShowUPIApps(false);
-  setPollAttempts(0);
-  setShowSupport(false);
-  
-  try {
-    const order = await createOrder();
-    if (!order) {
-      setProcessing(false);
+  const initiateRazorpayPayment = async () => {
+    if (!selectedAddress) {
+      alert('Please add a shipping address first');
       return;
     }
     
-    setOrderId(order.orderId);
+    setProcessing(true);
+    setPaymentStatus('pending');
+    setPollAttempts(0);
+    setShowSupport(false);
     
-    // ✅ Get UPI ID from database
-    const upiId = paymentMethod?.upiId || '';
-    
-    if (!upiId) {
-      alert('No UPI payment method configured. Please contact support.');
-      setProcessing(false);
-      return;
-    }
-    
-    const amount = finalTotal;
-    const orderId = order.orderId;
-    const name = 'LOOP Store';
-    const note = `Payment for Order ${orderId}`;
-    
-    const params = new URLSearchParams({
-      pa: upiId,        // ✅ Using UPI ID from database
-      pn: name,
-      am: amount.toString(),
-      cu: 'INR',
-      tn: note
-    });
-    
-    const upiLink = `${app.scheme}${params.toString()}`;
-    
-    window.location.href = upiLink;
-    
-    setPaymentStatus('verifying');
-    startPaymentVerification(order.orderId, order);
-    
-  } catch (err) {
-    console.error('Payment initiation failed:', err);
-    setPaymentStatus('failed');
-    setProcessing(false);
-    setShowSupport(true);
-  }
-};
-
-  const startPaymentVerification = (orderId, order) => {
-    let attempts = 0;
-    const maxAttempts = 30;
-    
-    const pollInterval = setInterval(async () => {
-      attempts++;
-      setPollAttempts(attempts);
+    try {
+      const order = await createOrder();
+      if (!order) {
+        setProcessing(false);
+        return;
+      }
       
-      try {
-        const response = await axios.get(`${API_URL}/api/orders/verify/${orderId}`);
-        
-        if (response.data.paymentStatus === 'paid') {
-          clearInterval(pollInterval);
-          setPaymentStatus('confirmed');
-          setProcessing(false);
-          setShowSupport(false);
-          
-          await clearCartAfterOrder();
-          
-          navigate('/order-confirmation', { 
-            state: { order: response.data.order }
-          });
+      setOrderId(order.orderId);
+      
+      const token = localStorage.getItem('loop_token');
+      const response = await axios.post(`${API_URL}/api/create-razorpay-order`, {
+        amount: finalTotal,
+        orderId: order.orderId
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const razorpayOrder = response.data;
+      
+      const options = {
+        key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_TTXVg2yp3HlxlP',
+        amount: razorpayOrder.amount,
+        currency: razorpayOrder.currency,
+        name: 'LOOP Store',
+        description: `Order ${order.orderId}`,
+        order_id: razorpayOrder.id,
+        prefill: {
+          name: order.customer?.name || '',
+          email: order.customer?.email || '',
+          contact: order.customer?.phone || ''
+        },
+        notes: {
+          order_id: order.orderId
+        },
+        theme: {
+          color: '#D4AF37'
+        },
+        handler: function(response) {
+          verifyRazorpayPayment(response, order.orderId);
+        },
+        modal: {
+          ondismiss: function() {
+            setProcessing(false);
+            setPaymentStatus('pending');
+            alert('Payment was not completed. Please try again when you are ready.');
+          }
         }
-        
-        if (attempts >= maxAttempts) {
-          clearInterval(pollInterval);
-          setPaymentStatus('failed');
-          setProcessing(false);
-          setShowSupport(true);
-        }
-        
-      } catch (err) {
-        console.error('Verification error:', err);
-      }
-    }, 10000);
-    
-    window.paymentPollInterval = pollInterval;
+      };
+      
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+      
+    } catch (err) {
+      console.error('Razorpay error:', err);
+      setProcessing(false);
+      setPaymentStatus('failed');
+      setShowSupport(true);
+      alert(err.response?.data?.error || 'Payment initiation failed. Please try again.');
+    }
   };
-
-const initiateRazorpayPayment = async () => {
-  if (!selectedAddress) {
-    alert('Please add a shipping address first');
-    return;
-  }
-  
-  setProcessing(true);
-  setPaymentStatus('pending');
-  setShowUPIApps(false);
-  setPollAttempts(0);
-  setShowSupport(false);
-  
-  try {
-    const order = await createOrder();
-    if (!order) {
-      setProcessing(false);
-      return;
-    }
-    
-    setOrderId(order.orderId);
-    
-    const token = localStorage.getItem('loop_token');
-    const response = await axios.post(`${API_URL}/api/create-razorpay-order`, {
-      amount: finalTotal,
-      orderId: order.orderId
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    
-    const razorpayOrder = response.data;
-    
-    // ✅ Get UPI ID from database (paymentMethod state)
-    const upiId = paymentMethod?.upiId || '';
-    
-    // ✅ If no UPI ID found, show error
-    if (!upiId) {
-      alert('No UPI payment method configured. Please contact support.');
-      setProcessing(false);
-      return;
-    }
-    
-    const options = {
-      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-      amount: razorpayOrder.amount,
-      currency: razorpayOrder.currency,
-      name: 'LOOP Store',
-      description: `Order ${order.orderId}`,
-      order_id: razorpayOrder.id,
-      prefill: {
-        name: order.customer?.name || '',
-        email: order.customer?.email || '',
-        contact: order.customer?.phone || ''
-      },
-      notes: {
-        order_id: order.orderId
-      },
-      theme: {
-        color: '#D4AF37'
-      },
-      // ✅ UPI Configuration - Dynamic from database
-      method: {
-        upi: true
-      },
-      upi: {
-        vpa: upiId  // ⬅️ Using UPI ID from database
-      },
-      handler: function(response) {
-        verifyRazorpayPayment(response, order.orderId);
-      },
-      modal: {
-        ondismiss: function() {
-          setProcessing(false);
-          setPaymentStatus('pending');
-          alert('Payment was not completed. Please try again when you are ready.');
-        }
-      }
-    };
-    
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-    
-  } catch (err) {
-    console.error('Razorpay error:', err);
-    setProcessing(false);
-    setPaymentStatus('failed');
-    setShowSupport(true);
-    alert(err.response?.data?.error || 'Payment initiation failed. Please try again.');
-  }
-};
 
   const verifyRazorpayPayment = async (paymentResponse, orderId) => {
     setPaymentStatus('verifying');
@@ -818,7 +683,6 @@ const initiateRazorpayPayment = async () => {
                   <span>₹{subtotal}</span>
                 </div>
                 
-                {/* Shipping Fee - FREE Badge when 0 */}
                 <div className="summary-row">
                   <span>🚚 Shipping Fee</span>
                   {shippingFee === 0 ? (
@@ -828,13 +692,11 @@ const initiateRazorpayPayment = async () => {
                   )}
                 </div>
                 
-                {/* Platform Fee - Always FREE */}
                 <div className="summary-row">
                   <span>✨ Platform Fee</span>
                   <span className="free-badge platform">FREE</span>
                 </div>
                 
-                {/* Handling Fee - Always FREE */}
                 <div className="summary-row">
                   <span>💫 Handling Fee</span>
                   <span className="free-badge handling">FREE</span>
@@ -872,84 +734,21 @@ const initiateRazorpayPayment = async () => {
               {couponSuccess && <p className="coupon-success">{couponSuccess}</p>}
             </div>
 
-            {/* Payment */}
+            {/* Payment - Razorpay Only */}
             <div className="checkout-section payment-section">
               <div className="section-header">
                 <h3>💳 Payment</h3>
               </div>
               
-              <div className="payment-options">
-                <button 
-                  className={`payment-option ${selectedPayment === 'razorpay' ? 'active' : ''}`}
-                  onClick={() => setSelectedPayment('razorpay')}
-                >
-                  💳 Card / UPI (Razorpay)
-                </button>
-                <button 
-                  className={`payment-option ${selectedPayment === 'upi' ? 'active' : ''}`}
-                  onClick={() => setSelectedPayment('upi')}
-                >
-                  📱 UPI App
-                </button>
-              </div>
-
-              {selectedPayment === 'upi' && paymentMethod && (
-                <div className="upi-payment-details">
-                  <div className="upi-qr-section">
-                    {paymentMethod.qrCode ? (
-                      <img src={paymentMethod.qrCode} alt="UPI QR" />
-                    ) : (
-                      <div className="qr-placeholder">📱</div>
-                    )}
-                    <div className="upi-id-section">
-                      <span className="upi-label">UPI ID</span>
-                      <div className="upi-id-display">
-                        <code>{paymentMethod.upiId}</code>
-                        <button onClick={copyUPI} className="copy-btn">
-                          {copied ? '✅' : '📋'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="payment-buttons">
-                {selectedPayment === 'razorpay' ? (
-                  <button
-                    className="pay-btn razorpay-btn"
-                    onClick={initiateRazorpayPayment}
-                    disabled={!selectedAddress || processing}
-                  >
-                    {processing ? '⏳ Processing...' : '💳 Pay with Razorpay'}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      className="pay-btn upi-btn"
-                      onClick={() => setShowUPIApps(!showUPIApps)}
-                      disabled={!selectedAddress || processing}
-                    >
-                      {processing ? '⏳ Processing...' : '📱 Pay with UPI App'}
-                    </button>
-                    
-                    {showUPIApps && !processing && (
-                      <div className="upi-apps-grid">
-                        {upiApps.map((app) => (
-                          <button
-                            key={app.id}
-                            className="upi-app-btn"
-                            onClick={() => initiateUPIPayment(app)}
-                            style={{ borderColor: app.color }}
-                          >
-                            <span className="app-icon">{app.icon}</span>
-                            <span className="app-name">{app.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
+                <button
+                  className="pay-btn razorpay-btn"
+                  onClick={initiateRazorpayPayment}
+                  disabled={!selectedAddress || processing}
+                  style={{ width: '100%' }}
+                >
+                  {processing ? '⏳ Processing...' : '💳 Pay with Razorpay'}
+                </button>
               </div>
 
               {processing && (
@@ -963,21 +762,21 @@ const initiateRazorpayPayment = async () => {
                 <div className="verification-status">
                   <div className="kawaii-spinner-small"></div>
                   <p>⏳ Waiting for payment confirmation...</p>
-                  <p className="verification-hint">Please complete the payment in your UPI app</p>
+                  <p className="verification-hint">Please complete the payment in the Razorpay window</p>
                   <p className="verification-attempts">Attempt {pollAttempts}/30</p>
                 </div>
               )}
 
               {paymentStatus === 'failed' && (
                 <div className="payment-failed">
-                  <p>❌ Payment Verification Failed</p>
-                  <p className="failed-hint">If you've already made the payment, please contact support.</p>
+                  <p>❌ Payment Failed</p>
+                  <p className="failed-hint">Please try again or use a different payment method.</p>
                   {orderId && (
                     <p className="order-id-display">📋 Order ID: {orderId}</p>
                   )}
                   <button 
                     className="retry-btn"
-                    onClick={() => { setPaymentStatus('pending'); setProcessing(false); setShowSupport(false); setPollAttempts(0); }}
+                    onClick={() => { setPaymentStatus('pending'); setProcessing(false); setPollAttempts(0); }}
                   >
                     🔄 Try Again
                   </button>
