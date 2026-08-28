@@ -146,12 +146,22 @@ function AppContent() {
 
     const savedCart = localStorage.getItem('loop_cart');
     if (savedCart) {
-      setCart(JSON.parse(savedCart));
+      try {
+        setCart(JSON.parse(savedCart));
+      } catch (e) {
+        console.error('Error parsing cart:', e);
+        localStorage.removeItem('loop_cart');
+      }
     }
     
     const savedWishlist = localStorage.getItem('loop_wishlist');
     if (savedWishlist) {
-      setWishlist(JSON.parse(savedWishlist));
+      try {
+        setWishlist(JSON.parse(savedWishlist));
+      } catch (e) {
+        console.error('Error parsing wishlist:', e);
+        localStorage.removeItem('loop_wishlist');
+      }
     }
     
     const token = localStorage.getItem('loop_token');
@@ -179,14 +189,18 @@ function AppContent() {
     }
   }, []);
 
-  // Save cart to localStorage whenever it changes
+  // ✅ Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('loop_cart', JSON.stringify(cart));
+    if (cart.length > 0 || localStorage.getItem('loop_cart')) {
+      localStorage.setItem('loop_cart', JSON.stringify(cart));
+    }
   }, [cart]);
 
-  // Save wishlist to localStorage whenever it changes
+  // ✅ Save wishlist to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('loop_wishlist', JSON.stringify(wishlist));
+    if (wishlist.length > 0 || localStorage.getItem('loop_wishlist')) {
+      localStorage.setItem('loop_wishlist', JSON.stringify(wishlist));
+    }
   }, [wishlist]);
 
   // ✅ Handle login with cart sync
@@ -199,8 +213,10 @@ function AppContent() {
       setUser(userData);
       setIsLoggedIn(true);
       
+      // ✅ Sync local cart to database
       await syncCartToDatabase(userData.id);
       
+      // ✅ Load database cart (which now includes synced items)
       const dbCart = await loadCartFromDatabase();
       if (dbCart && dbCart.length > 0) {
         setCart(dbCart);
@@ -220,10 +236,12 @@ function AppContent() {
     await clearCartInDatabase();
     localStorage.removeItem('loop_token');
     localStorage.removeItem('loop_user');
+    localStorage.removeItem('loop_cart');
+    localStorage.removeItem('loop_wishlist');
     setIsLoggedIn(false);
     setUser(null);
     setCart([]);
-    localStorage.removeItem('loop_cart');
+    setWishlist([]);
     showToast('👋 Logged out successfully', 'info');
   };
 
@@ -238,75 +256,132 @@ function AppContent() {
     }
   };
 
-  // ✅ Add to cart with database sync
+  // ✅ FIXED: Add to cart with proper localStorage sync
   const addToCart = async (product, selectedSize, quantity = 1) => {
+    if (!product || !product._id) {
+      console.error('❌ Cannot add: Invalid product');
+      return;
+    }
+    
     const displayPrice = product.salePrice && product.salePrice < product.price ? product.salePrice : product.price;
     const size = selectedSize || 'M';
     
-    const existing = cart.find(item => item.id === product._id && item.size === size);
-    let updatedCart;
-    
-    if (existing) {
-      updatedCart = cart.map(item => 
-        item.id === product._id && item.size === size 
-          ? { ...item, quantity: item.quantity + quantity } 
-          : item
-      );
-    } else {
-      updatedCart = [...cart, { 
-        id: product._id, 
-        name: product.name, 
-        price: displayPrice,
-        originalPrice: product.price,
-        image: product.image,
-        quantity: quantity || 1,
-        size: size
-      }];
-    }
-    
-    setCart(updatedCart);
-    localStorage.setItem('loop_cart', JSON.stringify(updatedCart));
-    
-    if (isLoggedIn && user) {
-      await syncCartToDatabase(user.id);
-    }
-    
-    showToast(`✅ Added ${product.name} (${size}) to cart!`, 'success');
+    setCart(prevCart => {
+      const existingIndex = prevCart.findIndex(item => item.id === product._id && item.size === size);
+      let updatedCart;
+      
+      if (existingIndex > -1) {
+        updatedCart = prevCart.map((item, index) => 
+          index === existingIndex 
+            ? { ...item, quantity: item.quantity + quantity } 
+            : item
+        );
+      } else {
+        updatedCart = [...prevCart, { 
+          id: product._id, 
+          name: product.name, 
+          price: displayPrice,
+          originalPrice: product.price,
+          image: product.image,
+          quantity: quantity || 1,
+          size: size
+        }];
+      }
+      
+      // ✅ Update localStorage
+      localStorage.setItem('loop_cart', JSON.stringify(updatedCart));
+      
+      // ✅ Sync to database if logged in
+      if (isLoggedIn && user) {
+        syncCartToDatabase(user.id);
+      }
+      
+      showToast(`✅ Added ${product.name} (${size}) to cart!`, 'success');
+      return updatedCart;
+    });
   };
 
+  // ✅ FIXED: Remove from cart with proper localStorage sync
   const removeFromCart = (id, size) => {
-    if (size) {
-      setCart(cart.filter(item => !(item.id === id && item.size === size)));
-    } else {
-      setCart(cart.filter(item => item.id !== id));
+    if (!id) {
+      console.error('❌ Cannot remove: No product ID provided');
+      return;
     }
+    
+    setCart(prevCart => {
+      let updatedCart;
+      if (size) {
+        updatedCart = prevCart.filter(item => !(item.id === id && item.size === size));
+      } else {
+        updatedCart = prevCart.filter(item => item.id !== id);
+      }
+      
+      // ✅ Update localStorage
+      localStorage.setItem('loop_cart', JSON.stringify(updatedCart));
+      
+      // ✅ Sync to database if logged in
+      if (isLoggedIn && user) {
+        syncCartToDatabase(user.id);
+      }
+      
+      return updatedCart;
+    });
   };
 
+  // ✅ FIXED: Update quantity with proper localStorage sync
   const updateQuantity = (id, newQty, size) => {
+    if (!id) {
+      console.error('❌ Cannot update: No product ID provided');
+      return;
+    }
+    
     if (newQty < 1) {
       removeFromCart(id, size);
       return;
     }
     
-    if (size) {
-      setCart(cart.map(item => 
-        item.id === id && item.size === size 
-          ? { ...item, quantity: newQty } 
-          : item
-      ));
-    } else {
-      setCart(cart.map(item => 
-        item.id === id ? { ...item, quantity: newQty } : item
-      ));
-    }
+    setCart(prevCart => {
+      let updatedCart;
+      if (size) {
+        updatedCart = prevCart.map(item => 
+          item.id === id && item.size === size 
+            ? { ...item, quantity: newQty } 
+            : item
+        );
+      } else {
+        updatedCart = prevCart.map(item => 
+          item.id === id ? { ...item, quantity: newQty } : item
+        );
+      }
+      
+      // ✅ Update localStorage
+      localStorage.setItem('loop_cart', JSON.stringify(updatedCart));
+      
+      // ✅ Sync to database if logged in
+      if (isLoggedIn && user) {
+        syncCartToDatabase(user.id);
+      }
+      
+      return updatedCart;
+    });
   };
 
   const toggleWishlist = (productId) => {
-    if (wishlist.includes(productId)) {
-      setWishlist(wishlist.filter(id => id !== productId));
-    } else {
-      setWishlist([...wishlist, productId]);
-    }
+    if (!productId) return;
+    
+    setWishlist(prevWishlist => {
+      let updatedWishlist;
+      if (prevWishlist.includes(productId)) {
+        updatedWishlist = prevWishlist.filter(id => id !== productId);
+        showToast('💔 Removed from wishlist', 'info');
+      } else {
+        updatedWishlist = [...prevWishlist, productId];
+        showToast('❤️ Added to wishlist!', 'success');
+      }
+      
+      localStorage.setItem('loop_wishlist', JSON.stringify(updatedWishlist));
+      return updatedWishlist;
+    });
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -502,11 +577,11 @@ function AppContent() {
               <p className="empty-cart">Your cart is empty</p>
             ) : (
               cart.map(item => (
-                <div key={`${item.id}-${item.size}`} className="cart-item">
+                <div key={`${item.id}-${item.size || 'M'}`} className="cart-item">
                   <div className="cart-item-info">
                     <p className="cart-item-name">
                       {item.name} 
-                      <span className="cart-item-size"> ({item.size})</span>
+                      <span className="cart-item-size"> ({item.size || 'M'})</span>
                     </p>
                     <p className="cart-item-price">₹{item.price}</p>
                   </div>
