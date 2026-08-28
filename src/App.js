@@ -304,7 +304,7 @@ function AppContent() {
   // ✅ FIXED: Remove from cart with proper localStorage sync
   const removeFromCart = (id, size) => {
     if (!id) {
-      console.error('❌ Cannot remove: No product ID provided');
+      console.warn('⚠️ Cannot remove: No product ID provided', { id, size });
       return;
     }
     
@@ -331,7 +331,7 @@ function AppContent() {
   // ✅ FIXED: Update quantity with proper localStorage sync
   const updateQuantity = (id, newQty, size) => {
     if (!id) {
-      console.error('❌ Cannot update: No product ID provided');
+      console.warn('⚠️ Cannot update: No product ID provided', { id, newQty, size });
       return;
     }
     
@@ -562,11 +562,11 @@ function AppContent() {
         </motion.div>
       </AnimatePresence>
 
-{/* Recently Viewed Section - Hide on Checkout, Order Confirmation, etc. */}
-{!['/checkout', '/order-confirmation', '/login', '/signup', '/profile'].includes(location.pathname) && (
-  <RecentlyViewed addToCart={addToCart} />
-)}
-                             
+      {/* Recently Viewed Section - Hide on Checkout, Order Confirmation, etc. */}
+      {!['/checkout', '/order-confirmation', '/login', '/signup', '/profile'].includes(location.pathname) && (
+        <RecentlyViewed addToCart={addToCart} />
+      )}
+
       {/* Cart Sidebar */}
       {showCart && (
         <div className="cart-sidebar">
