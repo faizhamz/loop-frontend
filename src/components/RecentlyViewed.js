@@ -4,8 +4,9 @@ import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import RatingStars from './RatingStars';
 
-function RecentlyViewed({ addToCart }) {  // ✅ Added addToCart as prop
-  const { recentlyViewed, clearRecentlyViewed } = useApp();
+function RecentlyViewed({ addToCart }) {
+  // ✅ Add removeFromRecentlyViewed to the destructuring
+  const { recentlyViewed, clearRecentlyViewed, removeFromRecentlyViewed } = useApp();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const scrollContainerRef = useRef(null);
   const navigate = useNavigate();
@@ -34,6 +35,17 @@ function RecentlyViewed({ addToCart }) {  // ✅ Added addToCart as prop
       addToCart(product);
     } else {
       console.warn('⚠️ addToCart function not available');
+    }
+  };
+
+  // ✅ Add this function - handles removing a single item
+  const handleRemoveItem = (productId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (removeFromRecentlyViewed) {
+      removeFromRecentlyViewed(productId);
+    } else {
+      console.warn('⚠️ removeFromRecentlyViewed function not available');
     }
   };
 
@@ -101,6 +113,15 @@ function RecentlyViewed({ addToCart }) {  // ✅ Added addToCart as prop
                   whileHover={{ y: -4, scale: 1.02 }}
                   onClick={() => navigate(`/product/${productSlug}`)}
                 >
+                  {/* ✅ DELETE BUTTON - ADD THIS */}
+                  <button 
+                    className="recent-remove-btn"
+                    onClick={(e) => handleRemoveItem(product._id, e)}
+                    title="Remove from recently viewed"
+                  >
+                    ✕
+                  </button>
+
                   <div className="recent-image-wrapper">
                     <img 
                       src={product.image || 'https://via.placeholder.com/120x120?text=LOOP'} 
@@ -196,6 +217,15 @@ function RecentlyViewed({ addToCart }) {  // ✅ Added addToCart as prop
                   whileHover={{ y: -4, scale: 1.02 }}
                   onClick={() => navigate(`/product/${productSlug}`)}
                 >
+                  {/* ✅ DELETE BUTTON - ADD THIS */}
+                  <button 
+                    className="recent-remove-btn"
+                    onClick={(e) => handleRemoveItem(product._id, e)}
+                    title="Remove from recently viewed"
+                  >
+                    ✕
+                  </button>
+
                   <div className="recent-image-wrapper">
                     <img 
                       src={product.image || 'https://via.placeholder.com/120x120?text=LOOP'} 

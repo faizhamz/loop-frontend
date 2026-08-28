@@ -21,7 +21,10 @@ export function AppProvider({ children }) {
   const [showSearchModal, setShowSearchModal] = useState(false);
 
   // Recently Viewed
-  const [recentlyViewed, setRecentlyViewed] = useState([]);
+  const [recentlyViewed, setRecentlyViewed] = useState(() => {
+    const saved = localStorage.getItem('loop_recently_viewed');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Notifications
   const [notifications, setNotifications] = useState([]);
@@ -41,10 +44,6 @@ export function AppProvider({ children }) {
 
   // Load from localStorage
   useEffect(() => {
-    const savedRecent = localStorage.getItem('loop_recently_viewed');
-    if (savedRecent) {
-      setRecentlyViewed(JSON.parse(savedRecent));
-    }
     const savedNotifications = localStorage.getItem('loop_notifications');
     if (savedNotifications) {
       setNotifications(JSON.parse(savedNotifications));
@@ -93,16 +92,37 @@ export function AppProvider({ children }) {
     setToast({ show: false, message: '', type: 'success' });
   };
 
+  // ============ RECENTLY VIEWED FUNCTIONS ============
+  
+  // ✅ Add to recently viewed
   const addToRecentlyViewed = (product) => {
     if (!product) return;
+    
     setRecentlyViewed(prev => {
+      // Remove duplicate if already exists
       const filtered = prev.filter(item => item._id !== product._id);
-      return [product, ...filtered].slice(0, 10);
+      // Add to front, keep max 10 items
+      const updated = [product, ...filtered].slice(0, 10);
+      localStorage.setItem('loop_recently_viewed', JSON.stringify(updated));
+      return updated;
     });
   };
 
+  // ✅ Remove single item from recently viewed
+  const removeFromRecentlyViewed = (productId) => {
+    if (!productId) return;
+    
+    setRecentlyViewed(prev => {
+      const updated = prev.filter(item => item._id !== productId);
+      localStorage.setItem('loop_recently_viewed', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // ✅ Clear all recently viewed
   const clearRecentlyViewed = () => {
     setRecentlyViewed([]);
+    localStorage.removeItem('loop_recently_viewed');
   };
 
   // Notifications
@@ -186,14 +206,22 @@ export function AppProvider({ children }) {
     refreshBanners();
   }, []);
 
+  // ============ CONTEXT VALUE ============
   const value = {
+    // Toast
     toast,
     showToast,
     hideToast,
+    
+    // User
     user,
     setUser,
+    
+    // Products
     products,
     setProducts,
+    
+    // Search
     searchQuery,
     setSearchQuery,
     searchResults,
@@ -201,9 +229,14 @@ export function AppProvider({ children }) {
     showSearchModal,
     setShowSearchModal,
     performSearch,
+    
+    // Recently Viewed - ✅ ALL THREE FUNCTIONS
     recentlyViewed,
     addToRecentlyViewed,
+    removeFromRecentlyViewed,   // ✅ NEW - Delete individual items
     clearRecentlyViewed,
+    
+    // Notifications
     notifications,
     unreadCount,
     loadNotifications,
@@ -211,9 +244,12 @@ export function AppProvider({ children }) {
     markAllAsRead,
     markAsRead,
     clearNotifications,
-    // ============ THEME ============
+    
+    // Theme
     isDarkMode,
     toggleTheme,
+    
+    // Banners
     banners,
     setBanners,
     bannerLoading,
