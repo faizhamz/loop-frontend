@@ -562,9 +562,15 @@ function AppContent() {
         </motion.div>
       </AnimatePresence>
 
+<<<<<<< HEAD
       {/* Recently Viewed Section - Hide on Checkout, Order Confirmation, Login, Signup, Profile */}
 {!['/checkout', '/order-confirmation', '/login', '/signup', '/profile'].includes(location.pathname) && (
   <RecentlyViewed />
+=======
+{/* Recently Viewed Section - Hide on Checkout, Order Confirmation, etc. */}
+{!['/checkout', '/order-confirmation', '/login', '/signup', '/profile'].includes(location.pathname) && (
+  <RecentlyViewed addToCart={addToCart} />
+>>>>>>> b630193 (fix: Cart button in Recently Viewed now working, cart auto-clear after order)
 )}
 
       {/* Cart Sidebar */}

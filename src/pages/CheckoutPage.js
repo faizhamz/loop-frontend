@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { clearCartInDatabase } from '../utils/cartSync';
 import './CheckoutPage.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
+const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
 function CheckoutPage() {
   const navigate = useNavigate();
@@ -311,10 +312,9 @@ function CheckoutPage() {
       localStorage.removeItem('loop_cart');
       const token = localStorage.getItem('loop_token');
       if (token) {
-        await axios.delete(`${API_URL}/api/cart/clear`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        await clearCartInDatabase();
       }
+      console.log('✅ Cart cleared after order');
     } catch (error) {
       console.error('Error clearing cart:', error);
     }

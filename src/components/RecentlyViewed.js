@@ -4,8 +4,8 @@ import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import RatingStars from './RatingStars';
 
-function RecentlyViewed() {
-  const { recentlyViewed, clearRecentlyViewed, addToCart } = useApp();
+function RecentlyViewed({ addToCart }) {  // ✅ Added addToCart as prop
+  const { recentlyViewed, clearRecentlyViewed } = useApp();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const scrollContainerRef = useRef(null);
   const navigate = useNavigate();
@@ -32,6 +32,8 @@ function RecentlyViewed() {
     e.stopPropagation();
     if (addToCart) {
       addToCart(product);
+    } else {
+      console.warn('⚠️ addToCart function not available');
     }
   };
 

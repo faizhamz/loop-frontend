@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import RatingStars from '../components/RatingStars';
+import { clearCartInDatabase } from '../utils/cartSync';
+import './OrderConfirmation.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
@@ -15,6 +17,28 @@ function OrderConfirmation() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+
+  // ✅ Clear cart when order is confirmed
+  useEffect(() => {
+    const clearCart = async () => {
+      try {
+        // Clear local storage
+        localStorage.removeItem('loop_cart');
+        
+        // Clear database cart if logged in
+        const token = localStorage.getItem('loop_token');
+        if (token) {
+          await clearCartInDatabase();
+        }
+        
+        console.log('✅ Cart cleared after order');
+      } catch (error) {
+        console.error('Error clearing cart:', error);
+      }
+    };
+    
+    clearCart();
+  }, []);
 
   useEffect(() => {
     const orderData = location.state?.order;
