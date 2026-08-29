@@ -950,3 +950,21 @@
     font-size: 10px;
   }
 }
+/* Custom scrollbar for coupons */
+.coupon-section .coupon-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.coupon-section .coupon-scroll::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+.coupon-section .coupon-scroll::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 4px;
+}
+
+.coupon-section .coupon-scroll::-webkit-scrollbar-thumb:hover {
+  background: #c49f2e;
+}

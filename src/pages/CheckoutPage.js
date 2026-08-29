@@ -25,6 +25,9 @@ function CheckoutPage() {
   const [couponSuccess, setCouponSuccess] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [showAvailableCoupons, setShowAvailableCoupons] = useState(false);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
   
   // Address States
   const [user, setUser] = useState(null);
@@ -90,9 +93,23 @@ function CheckoutPage() {
     }
     
     fetchActivePayment();
+    fetchAvailableCoupons();
   }, []);
 
-  // ✅ FIXED: Calculate totals with coupon
+  // ✅ Fetch available coupons
+  const fetchAvailableCoupons = async () => {
+    setLoadingCoupons(true);
+    try {
+      const response = await axios.get(`${API_URL}/api/coupons/available`);
+      setAvailableCoupons(response.data || []);
+    } catch (error) {
+      console.error('Error fetching coupons:', error);
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
+
+  // ✅ Calculate totals with coupon
   const calculateTotals = (cartItems) => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     setSubtotal(subtotal);
@@ -100,19 +117,17 @@ function CheckoutPage() {
     const shipping = subtotal > 999 ? 0 : 60;
     setShippingFee(shipping);
     
-    // Apply coupon discount
     const platform = 0;
     setPlatformFee(platform);
     
     const handling = 0;
     setHandlingFee(handling);
     
-    // ✅ Fixed: Calculate final total correctly
     const total = subtotal + shipping + platform + handling - couponDiscount;
     setFinalTotal(total);
   };
 
-  // ✅ When coupon discount changes, recalculate
+  // ✅ Recalculate when coupon changes
   useEffect(() => {
     calculateTotals(cart);
   }, [couponDiscount]);
@@ -202,7 +217,7 @@ function CheckoutPage() {
     setSelectedAddress(address);
   };
 
-  // ✅ FIXED: Apply Coupon
+  // ✅ Apply Coupon
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
       setCouponError('Please enter a coupon code');
@@ -226,9 +241,8 @@ function CheckoutPage() {
         const discountAmount = response.data.discountAmount || 0;
         setCouponDiscount(discountAmount);
         setAppliedCoupon(response.data);
-        setCouponSuccess(`✅ Coupon applied! You saved ₹${discountAmount}`);
+        setCouponSuccess(`✅ You saved ₹${discountAmount}`);
         setCouponError('');
-        // ✅ Recalculate totals with new discount
         calculateTotals(cart);
       } else {
         setCouponError(response.data.message || 'Invalid coupon');
@@ -246,6 +260,13 @@ function CheckoutPage() {
     setCouponError('');
     setAppliedCoupon(null);
     calculateTotals(cart);
+  };
+
+  // ✅ Quick apply available coupon
+  const quickApplyCoupon = (coupon) => {
+    setCouponCode(coupon.code);
+    setShowAvailableCoupons(false);
+    setTimeout(() => applyCoupon(), 300);
   };
 
   const createOrder = async () => {
@@ -661,50 +682,14 @@ function CheckoutPage() {
             </div>
           </div>
 
-          {/* Right Column - Order Summary */}
+          {/* Right Column - Coupon + Order Summary + Payment */}
           <div className="checkout-right">
-            <div className="checkout-section summary-section">
-              <div className="section-header">
-                <h3>💰 Order Summary</h3>
-              </div>
-
-              <div className="summary-breakdown">
-                <div className="summary-row">
-                  <span>Item Total</span>
-                  <span>₹{subtotal}</span>
-                </div>
-                
-                <div className="summary-row">
-                  <span>🚚 Shipping</span>
-                  {shippingFee === 0 ? (
-                    <span style={{ color: '#28a745', fontWeight: 'bold' }}>FREE</span>
-                  ) : (
-                    <span>₹{shippingFee}</span>
-                  )}
-                </div>
-
-                {/* ✅ Coupon Discount Row - Shows when applied */}
-                {couponDiscount > 0 && (
-                  <div className="summary-row" style={{ color: '#28a745' }}>
-                    <span>🎟️ Coupon ({appliedCoupon?.code || 'Applied'})</span>
-                    <span>-₹{couponDiscount}</span>
-                  </div>
-                )}
-
-                <div className="summary-divider"></div>
-                
-                <div className="summary-row total" style={{ fontSize: '20px' }}>
-                  <span><strong>Total</strong></span>
-                  <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>
-                    ₹{finalTotal}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* ✅ SIMPLIFIED COUPON SECTION - Like Myntra */}
+            
+            {/* ============================================ */}
+            {/* ✅ COUPON SECTION - ABOVE ORDER SUMMARY */}
+            {/* ============================================ */}
             <div className="checkout-section coupon-section">
-              <div className="coupon-input-group" style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '10px' }}>
                 <input
                   type="text"
                   placeholder="Apply Coupon"
@@ -758,34 +743,194 @@ function CheckoutPage() {
                 )}
               </div>
 
+              {/* Success/Error Messages */}
               {couponSuccess && (
-                <div style={{ 
-                  marginTop: '10px', 
-                  color: '#28a745',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}>
-                  <span>✅</span> {couponSuccess}
+                <div style={{ marginTop: '10px', color: '#28a745', fontSize: '13px' }}>
+                  ✅ {couponSuccess}
+                </div>
+              )}
+              {couponError && (
+                <div style={{ marginTop: '10px', color: '#ff4444', fontSize: '13px' }}>
+                  ❌ {couponError}
                 </div>
               )}
 
-              {couponError && (
+              {/* ✅ AVAILABLE COUPONS - Expandable Horizontal Chips */}
+              {availableCoupons.length > 0 && !couponDiscount && (
+                <div style={{ marginTop: '12px' }}>
+                  <button
+                    onClick={() => setShowAvailableCoupons(!showAvailableCoupons)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#888',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      padding: '4px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <span style={{ 
+                      display: 'inline-block',
+                      transition: 'transform 0.3s ease',
+                      transform: showAvailableCoupons ? 'rotate(90deg)' : 'rotate(0deg)'
+                    }}>
+                      ▶
+                    </span>
+                    {showAvailableCoupons ? 'Hide' : 'See available coupons'}
+                    <span style={{ color: '#D4AF37', fontSize: '12px', fontWeight: 'bold' }}>
+                      ({availableCoupons.length})
+                    </span>
+                  </button>
+
+                  {showAvailableCoupons && (
+                    <div style={{ marginTop: '10px' }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '10px', 
+                        overflowX: 'auto',
+                        padding: '4px 0 12px',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#D4AF37 transparent',
+                        WebkitOverflowScrolling: 'touch'
+                      }}>
+                        {availableCoupons.map((coupon) => (
+                          <div
+                            key={coupon._id}
+                            onClick={() => quickApplyCoupon(coupon)}
+                            style={{
+                              padding: '10px 18px',
+                              background: 'rgba(212, 175, 55, 0.08)',
+                              border: '1px solid rgba(212, 175, 55, 0.15)',
+                              borderRadius: '20px',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '10px',
+                              transition: 'all 0.3s ease',
+                              flexShrink: 0,
+                              minWidth: 'fit-content'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.18)';
+                              e.currentTarget.style.borderColor = '#D4AF37';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                              e.currentTarget.style.boxShadow = '0 4px 15px rgba(212, 175, 55, 0.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.08)';
+                              e.currentTarget.style.borderColor = 'rgba(212, 175, 55, 0.15)';
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          >
+                            <span style={{ fontWeight: 'bold', color: '#D4AF37', fontSize: '14px' }}>
+                              {coupon.code}
+                            </span>
+                            <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '13px' }}>
+                              {coupon.discountType === 'percentage' 
+                                ? `${coupon.discountValue}% OFF`
+                                : `₹${coupon.discountValue} OFF`
+                              }
+                            </span>
+                            {coupon.minOrderValue > 0 && (
+                              <span style={{ color: '#666', fontSize: '11px' }}>
+                                • Min ₹{coupon.minOrderValue}
+                              </span>
+                            )}
+                            {coupon.maxDiscount > 0 && coupon.discountType === 'percentage' && (
+                              <span style={{ color: '#888', fontSize: '11px' }}>
+                                • Max ₹{coupon.maxDiscount}
+                              </span>
+                            )}
+                            <span style={{ color: '#D4AF37', fontSize: '12px', marginLeft: '4px' }}>
+                              → Apply
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {availableCoupons.length > 3 && (
+                        <div style={{ fontSize: '10px', color: '#555', textAlign: 'right', marginTop: '-4px' }}>
+                          ↕ Scroll for more offers
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* No Coupons Available */}
+              {availableCoupons.length === 0 && !couponDiscount && (
                 <div style={{ 
-                  marginTop: '10px', 
-                  color: '#ff4444',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
+                  marginTop: '12px', 
+                  fontSize: '12px', 
+                  color: '#666',
+                  textAlign: 'center',
+                  padding: '4px 0'
                 }}>
-                  <span>❌</span> {couponError}
+                  No coupons available at the moment
                 </div>
               )}
             </div>
 
-            {/* Payment */}
+            {/* ============================================ */}
+            {/* ✅ ORDER SUMMARY */}
+            {/* ============================================ */}
+            <div className="checkout-section summary-section">
+              <div className="section-header">
+                <h3>💰 Order Summary</h3>
+              </div>
+
+              <div className="summary-breakdown">
+                <div className="summary-row">
+                  <span>Item Total ({cart.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
+                  <span>₹{subtotal}</span>
+                </div>
+                
+                <div className="summary-row">
+                  <span>🚚 Shipping</span>
+                  {shippingFee === 0 ? (
+                    <span style={{ color: '#28a745', fontWeight: 'bold' }}>FREE</span>
+                  ) : (
+                    <span>₹{shippingFee}</span>
+                  )}
+                </div>
+                
+                <div className="summary-row">
+                  <span>✨ Platform Fee</span>
+                  <span style={{ color: '#28a745', fontWeight: 'bold' }}>FREE</span>
+                </div>
+                
+                <div className="summary-row">
+                  <span>💫 Handling Fee</span>
+                  <span style={{ color: '#28a745', fontWeight: 'bold' }}>FREE</span>
+                </div>
+
+                {/* Coupon Discount - Shows when applied */}
+                {couponDiscount > 0 && (
+                  <div className="summary-row" style={{ color: '#28a745' }}>
+                    <span>🎟️ Coupon ({appliedCoupon?.code || 'Applied'})</span>
+                    <span>-₹{couponDiscount}</span>
+                  </div>
+                )}
+
+                <div className="summary-divider"></div>
+                
+                <div className="summary-row total" style={{ fontSize: '20px' }}>
+                  <span><strong>Total</strong></span>
+                  <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>
+                    ₹{finalTotal}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ============================================ */}
+            {/* ✅ PAYMENT SECTION */}
+            {/* ============================================ */}
             <div className="checkout-section payment-section">
               <button
                 className="pay-btn razorpay-btn"
@@ -822,6 +967,7 @@ function CheckoutPage() {
                 </div>
               )}
             </div>
+
           </div>
         </div>
       </div>
