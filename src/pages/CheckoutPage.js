@@ -305,13 +305,56 @@ function CheckoutPage() {
     calculateTotals(cart);
   };
 
-  // ✅ Quick apply available coupon
-  const quickApplyCoupon = (coupon) => {
-    console.log('🎟️ Quick apply:', coupon.code);
-    setCouponCode(coupon.code);
-    setShowAvailableCoupons(false);
-    setTimeout(() => applyCoupon(), 300);
-  };
+  // ✅ FIXED: Direct apply coupon without state delay
+const quickApplyCoupon = (coupon) => {
+  console.log('🎟️ Quick apply:', coupon.code);
+  setShowAvailableCoupons(false);
+  
+  // Directly apply the coupon without waiting for state
+  applyCouponDirect(coupon.code);
+};
+
+// ✅ NEW: Direct coupon application
+const applyCouponDirect = async (code) => {
+  if (!code || !code.trim()) {
+    setCouponError('Please enter a coupon code');
+    return;
+  }
+
+  setCouponError('');
+  setCouponSuccess('');
+  setCouponCode(code); // Update UI
+
+  try {
+    const token = localStorage.getItem('loop_token');
+    const userId = user?.id || null;
+
+    console.log('🎟️ Applying coupon directly:', code, 'Subtotal:', subtotal);
+
+    const response = await axios.post(`${API_URL}/api/coupons/validate`, {
+      code: code.toUpperCase(),
+      userId,
+      cartTotal: subtotal
+    });
+
+    console.log('🎟️ Coupon response:', response.data);
+
+    if (response.data.valid) {
+      const discountAmount = response.data.discountAmount || 0;
+      console.log('🎟️ Discount amount:', discountAmount);
+      setCouponDiscount(discountAmount);
+      setAppliedCoupon(response.data);
+      setCouponSuccess(`✅ You saved ₹${discountAmount}`);
+      setCouponError('');
+      calculateTotals(cart);
+    } else {
+      setCouponError(response.data.message || 'Invalid coupon');
+    }
+  } catch (error) {
+    console.error('Coupon error:', error);
+    setCouponError(error.response?.data?.message || 'Failed to apply coupon');
+  }
+};
 
   const createOrder = async () => {
     try {
