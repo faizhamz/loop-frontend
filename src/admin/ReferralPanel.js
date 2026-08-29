@@ -16,10 +16,12 @@ function ReferralPanel() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [analytics, setAnalytics] = useState(null);
+  const [recentActivity, setRecentActivity] = useState([]);
 
   useEffect(() => {
     fetchSettings();
     fetchAnalytics();
+    fetchRecentActivity();
   }, []);
 
   const fetchSettings = async () => {
@@ -45,6 +47,18 @@ function ReferralPanel() {
       setAnalytics(response.data);
     } catch (err) {
       console.error('Error fetching analytics:', err);
+    }
+  };
+
+  const fetchRecentActivity = async () => {
+    try {
+      const token = localStorage.getItem('loop_token');
+      const response = await axios.get(`${API_URL}/api/referral/admin/recent-activity`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRecentActivity(response.data || []);
+    } catch (err) {
+      console.error('Error fetching recent activity:', err);
     }
   };
 
@@ -140,7 +154,7 @@ function ReferralPanel() {
       )}
 
       {/* Settings Form */}
-      <form onSubmit={handleSubmit} style={{ maxWidth: '500px' }}>
+      <form onSubmit={handleSubmit} style={{ maxWidth: '600px' }}>
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc', cursor: 'pointer' }}>
             <input
@@ -199,9 +213,19 @@ function ReferralPanel() {
           <small style={{ color: '#666' }}>Minimum order value required for referral reward</small>
         </div>
 
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
-            🎉 Welcome Bonus (₹)
+        {/* ✅ WELCOME BONUS - Admin Can Manage */}
+        <div style={{ 
+          marginBottom: '15px',
+          border: '1px solid rgba(212, 175, 55, 0.2)',
+          borderRadius: '8px',
+          padding: '16px',
+          background: 'rgba(212, 175, 55, 0.05)'
+        }}>
+          <label style={{ color: '#D4AF37', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+            🎉 Welcome Bonus (₹) 
+            <span style={{ color: '#666', fontSize: '11px', marginLeft: '8px' }}>
+              (Auto-credited on signup)
+            </span>
           </label>
           <input
             type="number"
@@ -219,7 +243,12 @@ function ReferralPanel() {
             }}
             required
           />
-          <small style={{ color: '#666' }}>Bonus given to new user who signs up with referral</small>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+            <small style={{ color: '#666' }}>Bonus given to new user who signs up</small>
+            <small style={{ color: '#D4AF37' }}>
+              💡 Current: ₹{settings.welcomeBonus}
+            </small>
+          </div>
         </div>
 
         <div style={{ marginBottom: '20px' }}>
@@ -260,6 +289,43 @@ function ReferralPanel() {
           {saving ? 'Saving...' : '💾 Save Settings'}
         </button>
       </form>
+
+      {/* 📊 Recent Activity */}
+      {recentActivity.length > 0 && (
+        <div style={{ marginTop: '30px' }}>
+          <h3 style={{ color: '#D4AF37' }}>📊 Recent Activity</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333', color: '#888' }}>User</th>
+                  <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333', color: '#888' }}>Event</th>
+                  <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333', color: '#888' }}>Amount</th>
+                  <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333', color: '#888' }}>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentActivity.map((activity, index) => (
+                  <tr key={index}>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #222', color: '#fff' }}>
+                      {activity.userName || 'User'}
+                    </td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #222', color: '#ccc' }}>
+                      {activity.event}
+                    </td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #222', color: '#D4AF37' }}>
+                      +₹{activity.amount}
+                    </td>
+                    <td style={{ padding: '10px', borderBottom: '1px solid #222', color: '#666', fontSize: '12px' }}>
+                      {new Date(activity.createdAt).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Top Referrers */}
       {analytics?.topReferrers && analytics.topReferrers.length > 0 && (
