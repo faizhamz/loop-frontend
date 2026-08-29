@@ -308,7 +308,7 @@ function HomePage({
       <section className="category-section">
         <div className="container">
           <div className="category-section-header">
-            <h2 className="category-section-title">🛍️ Shop By Category</h2>
+            <h2 className="category-section-title">Explore By Category</h2>
             {(categories || []).length > 0 && (
               <span className="category-section-count">{(categories || []).length} Categories</span>
             )}
