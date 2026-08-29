@@ -24,6 +24,11 @@ function CheckoutPage() {
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
+  const [maxDiscountInfo, setMaxDiscountInfo] = useState(null);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [showAvailableCoupons, setShowAvailableCoupons] = useState(false);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
   
   // Address States
   const [user, setUser] = useState(null);
@@ -53,7 +58,6 @@ function CheckoutPage() {
   const [platformFee, setPlatformFee] = useState(0);
   const [handlingFee, setHandlingFee] = useState(0);
   const [finalTotal, setFinalTotal] = useState(0);
-  
   const [orderId, setOrderId] = useState(null);
   const [showSupport, setShowSupport] = useState(false);
 
@@ -90,7 +94,20 @@ function CheckoutPage() {
     }
     
     fetchActivePayment();
+    fetchAvailableCoupons();
   }, []);
+
+  const fetchAvailableCoupons = async () => {
+    setLoadingCoupons(true);
+    try {
+      const response = await axios.get(`${API_URL}/api/coupons/available`);
+      setAvailableCoupons(response.data || []);
+    } catch (error) {
+      console.error('Error fetching coupons:', error);
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
 
   const calculateTotals = (cartItems) => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -194,7 +211,7 @@ function CheckoutPage() {
     setSelectedAddress(address);
   };
 
-  // Coupon
+  // ✅ Coupon Functions
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
       setCouponError('Please enter a coupon code');
@@ -203,6 +220,8 @@ function CheckoutPage() {
 
     setCouponError('');
     setCouponSuccess('');
+    setCouponDiscount(0);
+    setMaxDiscountInfo(null);
 
     try {
       const token = localStorage.getItem('loop_token');
@@ -217,7 +236,22 @@ function CheckoutPage() {
       if (response.data.valid) {
         const discountAmount = response.data.discountAmount || 0;
         setCouponDiscount(discountAmount);
-        setCouponSuccess(`✅ Coupon applied! You saved ₹${discountAmount}`);
+        setAppliedCoupon(response.data);
+        
+        if (response.data.maxDiscount > 0 && response.data.discountPercent > 0) {
+          setMaxDiscountInfo({
+            maxDiscount: response.data.maxDiscount,
+            discountPercent: response.data.discountPercent,
+            effectiveDiscountPercent: response.data.effectiveDiscountPercent || response.data.discountPercent,
+            maxApplied: response.data.maxDiscountApplied
+          });
+        }
+        
+        const discountMessage = response.data.maxDiscountApplied 
+          ? `✅ Coupon applied! Max discount of ₹${response.data.maxDiscount} applied (${response.data.effectiveDiscountPercent || response.data.discountPercent}%)`
+          : `✅ Coupon applied! You saved ₹${discountAmount} (${response.data.discountPercent}%)`;
+        
+        setCouponSuccess(discountMessage);
         setCouponError('');
         calculateTotals(cart);
       } else {
@@ -226,6 +260,23 @@ function CheckoutPage() {
     } catch (error) {
       setCouponError(error.response?.data?.message || 'Failed to apply coupon');
     }
+  };
+
+  const removeCoupon = () => {
+    setCouponDiscount(0);
+    setCouponCode('');
+    setCouponSuccess('');
+    setCouponError('');
+    setMaxDiscountInfo(null);
+    setAppliedCoupon(null);
+    calculateTotals(cart);
+  };
+
+  const quickApplyCoupon = (coupon) => {
+    setCouponCode(coupon.code);
+    setShowAvailableCoupons(false);
+    // Auto apply after a brief delay
+    setTimeout(() => applyCoupon(), 300);
   };
 
   const createOrder = async () => {
@@ -353,6 +404,11 @@ function CheckoutPage() {
         },
         modal: {
           ondismiss: function() {
+            // Cancel the order when user closes Razorpay
+            axios.post(`${API_URL}/api/orders/cancel-pending/${order.orderId}`, {}, {
+              headers: { Authorization: `Bearer ${token}` }
+            }).catch(() => {});
+            
             setProcessing(false);
             setPaymentStatus('pending');
             alert('Payment was not completed. Please try again when you are ready.');
@@ -702,36 +758,238 @@ function CheckoutPage() {
                   <span className="free-badge handling">FREE</span>
                 </div>
                 
+                {/* ✅ Show coupon discount with visual */}
                 {couponDiscount > 0 && (
-                  <div className="summary-row discount">
-                    <span>🎟️ Coupon Discount</span>
-                    <span>-₹{couponDiscount}</span>
+                  <div className="summary-row discount" style={{ 
+                    background: 'rgba(40, 167, 69, 0.08)',
+                    padding: '6px 0',
+                    borderRadius: '4px',
+                    margin: '2px 0'
+                  }}>
+                    <span>
+                      🎟️ Coupon Discount
+                      {appliedCoupon && (
+                        <span style={{ fontSize: '12px', color: '#888', marginLeft: '4px' }}>
+                          ({appliedCoupon.code})
+                        </span>
+                      )}
+                      {maxDiscountInfo?.maxApplied && (
+                        <span style={{ fontSize: '11px', color: '#ff8800', marginLeft: '4px' }}>
+                          (Max ₹{maxDiscountInfo.maxDiscount})
+                        </span>
+                      )}
+                    </span>
+                    <span style={{ color: '#28a745', fontWeight: 'bold' }}>-₹{couponDiscount}</span>
                   </div>
                 )}
+                
                 <div className="summary-divider"></div>
-                <div className="summary-row total">
+                <div className="summary-row total" style={{ fontSize: '20px' }}>
                   <span><strong>💰 Total Amount</strong></span>
-                  <span><strong>₹{finalTotal}</strong></span>
+                  <span style={{ color: '#D4AF37' }}><strong>₹{finalTotal}</strong></span>
                 </div>
               </div>
             </div>
 
-            {/* Coupon */}
-            <div className="checkout-section coupon-section">
+            {/* ✅ Coupon Section - Beautiful UI */}
+            <div className="checkout-section coupon-section" style={{ 
+              border: couponDiscount > 0 ? '2px solid #28a745' : '1px solid #333',
+              transition: 'all 0.3s ease'
+            }}>
               <div className="section-header">
-                <h3>🎟️ Coupon Code</h3>
+                <h3>🎟️ Apply Coupon</h3>
+                {couponDiscount > 0 && (
+                  <span style={{ color: '#28a745', fontWeight: 'bold' }}>
+                    ✅ Applied
+                  </span>
+                )}
               </div>
+              
               <div className="coupon-input-group">
                 <input
                   type="text"
                   placeholder="Enter coupon code"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  disabled={couponDiscount > 0}
+                  style={{ 
+                    opacity: couponDiscount > 0 ? 0.6 : 1,
+                    borderColor: couponDiscount > 0 ? '#28a745' : undefined
+                  }}
                 />
-                <button onClick={applyCoupon}>Apply</button>
+                {couponDiscount > 0 ? (
+                  <button 
+                    onClick={removeCoupon}
+                    style={{ 
+                      background: '#ff4444',
+                      border: 'none',
+                      padding: '10px 20px',
+                      borderRadius: '6px',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✕ Remove
+                  </button>
+                ) : (
+                  <button 
+                    onClick={applyCoupon}
+                    style={{ 
+                      background: '#D4AF37',
+                      border: 'none',
+                      padding: '10px 20px',
+                      borderRadius: '6px',
+                      color: '#000',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Apply
+                  </button>
+                )}
               </div>
-              {couponError && <p className="coupon-error">{couponError}</p>}
-              {couponSuccess && <p className="coupon-success">{couponSuccess}</p>}
+              
+              {/* ✅ Coupon Applied Success Message */}
+              {couponSuccess && (
+                <div style={{
+                  marginTop: '10px',
+                  padding: '12px 16px',
+                  background: 'rgba(40, 167, 69, 0.1)',
+                  border: '1px solid rgba(40, 167, 69, 0.2)',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '8px'
+                }}>
+                  <div>
+                    <span style={{ color: '#28a745' }}>✅</span>
+                    <span style={{ color: '#ccc', marginLeft: '8px' }}>{couponSuccess}</span>
+                  </div>
+                  {maxDiscountInfo && (
+                    <div style={{ fontSize: '12px', color: '#888' }}>
+                      {maxDiscountInfo.maxApplied ? (
+                        <span style={{ color: '#ff8800' }}>
+                          Max discount ₹{maxDiscountInfo.maxDiscount} applied 
+                          ({maxDiscountInfo.effectiveDiscountPercent || maxDiscountInfo.discountPercent}%)
+                        </span>
+                      ) : (
+                        <span style={{ color: '#28a745' }}>
+                          {maxDiscountInfo.discountPercent}% off • Max ₹{maxDiscountInfo.maxDiscount}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* ✅ Coupon Error */}
+              {couponError && (
+                <div style={{
+                  marginTop: '10px',
+                  padding: '10px 14px',
+                  background: 'rgba(255, 68, 68, 0.1)',
+                  border: '1px solid rgba(255, 68, 68, 0.2)',
+                  borderRadius: '8px',
+                  color: '#ff4444',
+                  fontSize: '13px'
+                }}>
+                  {couponError}
+                </div>
+              )}
+
+              {/* ✅ Available Coupons Section */}
+              {availableCoupons.length > 0 && !couponDiscount && (
+                <div style={{ marginTop: '16px' }}>
+                  <button
+                    onClick={() => setShowAvailableCoupons(!showAvailableCoupons)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#D4AF37',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      padding: '4px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    {showAvailableCoupons ? '▲ Hide available coupons' : '▼ Show available coupons'}
+                    <span style={{ fontSize: '11px', color: '#666' }}>
+                      ({availableCoupons.length} available)
+                    </span>
+                  </button>
+
+                  {showAvailableCoupons && (
+                    <div style={{ 
+                      marginTop: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      maxHeight: '200px',
+                      overflowY: 'auto'
+                    }}>
+                      {availableCoupons.map((coupon) => (
+                        <div
+                          key={coupon._id}
+                          onClick={() => quickApplyCoupon(coupon)}
+                          style={{
+                            padding: '12px 16px',
+                            background: '#1a1a1a',
+                            border: '1px solid #333',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '8px'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#D4AF37';
+                            e.currentTarget.style.background = '#222';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = '#333';
+                            e.currentTarget.style.background = '#1a1a1a';
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 'bold', color: '#D4AF37' }}>
+                              {coupon.code}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#888' }}>
+                              {coupon.name || coupon.description}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ color: '#28a745', fontWeight: 'bold' }}>
+                              {coupon.discountType === 'percentage' 
+                                ? `${coupon.discountValue}% OFF`
+                                : `₹${coupon.discountValue} OFF`
+                              }
+                            </div>
+                            {coupon.maxDiscount > 0 && (
+                              <div style={{ fontSize: '11px', color: '#888' }}>
+                                Max ₹{coupon.maxDiscount}
+                              </div>
+                            )}
+                            {coupon.minOrderValue > 0 && (
+                              <div style={{ fontSize: '11px', color: '#666' }}>
+                                Min ₹{coupon.minOrderValue}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Payment - Razorpay Only */}
