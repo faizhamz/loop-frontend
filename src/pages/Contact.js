@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import WhatsAppIcon from '../components/WhatsAppIcon';
 import './Contact.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
@@ -23,7 +24,6 @@ function Contact() {
     }
   };
 
-  // ✅ Open WhatsApp with contact number
   const openWhatsApp = (phoneNumber, message = '') => {
     if (!phoneNumber) return;
     const cleanNumber = phoneNumber.replace(/\D/g, '');
@@ -42,7 +42,6 @@ function Contact() {
     );
   }
 
-  // Check if any contact info exists
   const hasInfo = contact && Object.values(contact).some(
     val => val && typeof val === 'string' && val.trim() !== ''
   );
@@ -83,28 +82,43 @@ function Contact() {
             </div>
           )}
 
-          {/* ✅ Phone - Clickable to WhatsApp */}
-          {contact.phone && (
-            <div className="contact-item clickable" onClick={() => openWhatsApp(contact.phone)} style={{ cursor: 'pointer' }}>
-              <div className="contact-icon">📞</div>
+          {/* ✅ WhatsApp - With Icon */}
+          {contact.whatsapp && (
+            <div 
+              className="contact-item clickable" 
+              onClick={() => openWhatsApp(contact.whatsapp)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className="contact-icon">
+                <WhatsAppIcon size={28} />
+              </div>
               <div className="contact-content">
-                <h4>Phone <span style={{ fontSize: '12px', color: '#25D366' }}>(💬 WhatsApp)</span></h4>
-                <a href={`tel:${contact.phone}`} onClick={(e) => e.preventDefault()}>
-                  {contact.phone}
+                <h4 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  WhatsApp 
+                  <span style={{ 
+                    fontSize: '11px', 
+                    color: '#25D366',
+                    background: 'rgba(37, 211, 102, 0.1)',
+                    padding: '2px 8px',
+                    borderRadius: '10px'
+                  }}>
+                    Chat Now 💬
+                  </span>
+                </h4>
+                <a href="#" onClick={(e) => e.preventDefault()} style={{ color: '#25D366' }}>
+                  {contact.whatsapp}
                 </a>
               </div>
             </div>
           )}
 
-          {/* ✅ WhatsApp - Direct WhatsApp link */}
-          {contact.whatsapp && (
-            <div className="contact-item clickable" onClick={() => openWhatsApp(contact.whatsapp)} style={{ cursor: 'pointer' }}>
-              <div className="contact-icon">💬</div>
+          {/* Phone */}
+          {contact.phone && (
+            <div className="contact-item">
+              <div className="contact-icon">📞</div>
               <div className="contact-content">
-                <h4>WhatsApp <span style={{ fontSize: '12px', color: '#25D366' }}>💬</span></h4>
-                <a href="#" onClick={(e) => e.preventDefault()}>
-                  {contact.whatsapp}
-                </a>
+                <h4>Phone</h4>
+                <a href={`tel:${contact.phone}`}>{contact.phone}</a>
               </div>
             </div>
           )}

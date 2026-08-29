@@ -3,9 +3,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
 import axios from 'axios';
+import { useApp } from '../context/AppContext';
 import RatingStars from '../components/RatingStars';
 import ReviewModal from '../components/ReviewModal';
 import StockWarning, { VariantStockWarning } from '../components/StockWarning';
+import WhatsAppIcon from '../components/WhatsAppIcon';
 import './ProductPage.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
@@ -143,6 +145,10 @@ function ProductPage({
 }) {
   const { slug } = useParams();
   const navigate = useNavigate();
+  
+  // ✅ Get theme from context
+  const { isDarkMode } = useApp();
+  
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState('');
@@ -186,6 +192,20 @@ function ProductPage({
   const modalImageRef = useRef(null);
   const toastTimeoutRef = useRef(null);
   const quantityTimeoutRef = useRef(null);
+
+  // ✅ Theme-based styles
+  const themeStyles = {
+    background: isDarkMode ? '#0a0a0a' : '#f8f4f9',
+    color: isDarkMode ? '#ffffff' : '#2d1b2e',
+    cardBg: isDarkMode ? '#111111' : '#ffffff',
+    cardBorder: isDarkMode ? '#333333' : '#e8e0e5',
+    textSecondary: isDarkMode ? '#888888' : '#666666',
+    textMuted: isDarkMode ? '#555555' : '#999999',
+    inputBg: isDarkMode ? '#222222' : '#ffffff',
+    inputBorder: isDarkMode ? '#333333' : '#e8e0e5',
+    shadow: isDarkMode ? '0 8px 30px rgba(0,0,0,0.3)' : '0 8px 30px rgba(0,0,0,0.08)',
+    shadowHover: isDarkMode ? '0 12px 50px rgba(0,0,0,0.4)' : '0 12px 50px rgba(0,0,0,0.12)',
+  };
 
   // ✅ Fetch WhatsApp number
   useEffect(() => {
@@ -853,6 +873,7 @@ function ProductPage({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
+        style={{ background: themeStyles.background, color: themeStyles.color }}
       >
         <div className="spinner"></div>
         <p>Loading product...</p>
@@ -868,10 +889,11 @@ function ProductPage({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
+        style={{ background: themeStyles.background, color: themeStyles.color }}
       >
-        <h2>Product Not Found</h2>
-        <p>{error || 'Sorry, we couldn\'t find this product.'}</p>
-        <Link to="/" className="back-home">Back to Home</Link>
+        <h2 style={{ color: '#ff4444' }}>Product Not Found</h2>
+        <p style={{ color: themeStyles.textSecondary }}>{error || 'Sorry, we couldn\'t find this product.'}</p>
+        <Link to="/" className="back-home" style={{ color: '#D4AF37' }}>Back to Home</Link>
       </motion.div>
     );
   }
@@ -883,7 +905,7 @@ function ProductPage({
   const displayQuantity = isInCart ? cartQuantity : quantity;
   const totalSold = product.totalSold || 0;
 
-  // Get unique sizes and colors from variants (for backward compatibility)
+  // Get unique sizes and colors from variants
   const uniqueSizes = product.variants && product.variants.length > 0 
     ? product.variants.find(v => v.type === 'Size' || v.name === 'Size')?.options.map(o => o.value) || []
     : [product.size || 'M'];
@@ -892,7 +914,7 @@ function ProductPage({
     ? product.variants.find(v => v.type === 'Color' || v.name === 'Color')?.options.map(o => o.value) || []
     : [product.color || 'Black'];
 
-  // ✅ Build Schema.org JSON-LD
+  // Schema.org JSON-LD
   const productSchema = {
     "@context": "https://schema.org/",
     "@type": "Product",
@@ -914,7 +936,6 @@ function ProductPage({
     }
   };
 
-  // Add aggregate rating if available
   if (product.avgRating > 0 && product.reviewCount > 0) {
     productSchema.aggregateRating = {
       "@type": "AggregateRating",
@@ -924,15 +945,21 @@ function ProductPage({
   }
 
   return (
-    <div className="product-page">
+    <div 
+      className="product-page" 
+      style={{ 
+        background: themeStyles.background,
+        color: themeStyles.color,
+        minHeight: '100vh',
+        paddingTop: '80px'
+      }}
+    >
       {/* ✅ META TAGS + SCHEMA */}
       <Helmet>
         <title>{product.name} | LOOP - Premium Fashion</title>
         <meta name="description" content={`Buy ${product.name} online at LOOP. ₹${product.price}. ${product.description?.slice(0, 150) || 'Premium quality product with free delivery on orders above ₹999.'}`} />
         <meta name="keywords" content={`${product.name}, loop, fashion, ${product.category}, ${product.color || ''}, ${product.size || ''}, clothing`} />
         <link rel="canonical" href={`https://loopstore.in/product/${product.productId}`} />
-        
-        {/* Open Graph */}
         <meta property="og:title" content={`${product.name} | LOOP`} />
         <meta property="og:description" content={`Buy ${product.name} at LOOP. ₹${product.price}. Free delivery on orders above ₹999.`} />
         <meta property="og:image" content={product.image || product.images?.[0] || ''} />
@@ -940,14 +967,10 @@ function ProductPage({
         <meta property="og:type" content="product" />
         <meta property="og:price:amount" content={hasSale ? product.salePrice : product.price} />
         <meta property="og:price:currency" content="INR" />
-        
-        {/* Twitter Cards */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${product.name} | LOOP`} />
         <meta name="twitter:description" content={`Buy ${product.name} at LOOP. ₹${product.price}.`} />
         <meta name="twitter:image" content={product.image || product.images?.[0] || ''} />
-        
-        {/* ✅ Schema.org JSON-LD */}
         <script type="application/ld+json">
           {JSON.stringify(productSchema)}
         </script>
@@ -959,6 +982,11 @@ function ProductPage({
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: showToast ? 1 : 0, y: showToast ? 0 : -20 }}
         transition={{ duration: 0.3 }}
+        style={{ 
+          background: isDarkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.95)',
+          color: themeStyles.color,
+          borderColor: themeStyles.cardBorder
+        }}
       >
         {toastMessage}
       </motion.div>
@@ -974,8 +1002,24 @@ function ProductPage({
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           title="Chat with us on WhatsApp"
+          style={{
+            position: 'fixed',
+            bottom: '30px',
+            right: '30px',
+            background: '#25D366',
+            border: 'none',
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            cursor: 'pointer',
+            zIndex: 1000,
+            boxShadow: '0 4px 20px rgba(37, 211, 102, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
         >
-          💬
+          <WhatsAppIcon size={32} color="#ffffff" />
         </motion.button>
       )}
 
@@ -993,17 +1037,18 @@ function ProductPage({
         }}
       />
 
-      <div className="container">
+      <div className="container" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 40px' }}>
         {/* Breadcrumb */}
         <motion.div 
           className="breadcrumb"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
+          style={{ color: themeStyles.textMuted }}
         >
-          <Link to="/">Home</Link>
-          <span>›</span>
-          <span className="current">{product.name}</span>
+          <Link to="/" style={{ color: '#D4AF37' }}>Home</Link>
+          <span style={{ color: themeStyles.textMuted }}>›</span>
+          <span className="current" style={{ color: themeStyles.color }}>{product.name}</span>
         </motion.div>
 
         <motion.div 
@@ -1011,11 +1056,13 @@ function ProductPage({
           initial="hidden"
           animate="visible"
           variants={staggerContainer}
+          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', padding: '20px 0 40px' }}
         >
           {/* Left Column - Media */}
           <motion.div 
             className="product-images-section"
             variants={fadeInUp}
+            style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}
           >
             <div 
               className="main-image"
@@ -1024,6 +1071,14 @@ function ProductPage({
               onTouchEnd={handleTouchEnd}
               ref={imageRef}
               onClick={() => openFullscreen(currentMediaIndex)}
+              style={{ 
+                position: 'relative',
+                background: isDarkMode ? '#1a1a1a' : '#f0e8ed',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                transition: 'box-shadow 0.3s ease'
+              }}
             >
               <MediaRenderer 
                 media={allMedia[currentMediaIndex] || allMedia[0]} 
@@ -1032,12 +1087,40 @@ function ProductPage({
               
               {/* Media type badge */}
               {allMedia[currentMediaIndex] && (
-                <div className="media-type-badge">
+                <div className="media-type-badge" style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'rgba(0,0,0,0.75)',
+                  color: '#fff',
+                  padding: '4px 14px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  zIndex: 10,
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255,255,255,0.1)'
+                }}>
                   {isVideoUrl(allMedia[currentMediaIndex]) ? '🎬 Video' : '📸 Image'}
                 </div>
               )}
               
-              {hasSale && <span className="sale-badge-big">-{discountPercent}%</span>}
+              {hasSale && (
+                <span className="sale-badge-big" style={{
+                  position: 'absolute',
+                  top: '16px',
+                  left: '16px',
+                  background: '#ff4444',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  zIndex: 2
+                }}>
+                  -{discountPercent}%
+                </span>
+              )}
               
               <motion.button 
                 className={`wishlist-btn-image ${isInWishlist ? 'active' : ''}`}
@@ -1047,21 +1130,75 @@ function ProductPage({
                 }}
                 whileHover={{ scale: 1.15 }}
                 whileTap={{ scale: 0.85 }}
+                style={{
+                  position: 'absolute',
+                  top: '16px',
+                  right: '16px',
+                  background: 'rgba(0,0,0,0.6)',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '28px',
+                  padding: '8px 12px',
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  zIndex: 10,
+                  backdropFilter: 'blur(4px)',
+                  width: '50px',
+                  height: '50px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
               >
                 {isInWishlist ? '❤️' : '🤍'}
               </motion.button>
               
-              <div className="image-counter">
+              <div className="image-counter" style={{
+                position: 'absolute',
+                bottom: '60px',
+                right: '16px',
+                background: 'rgba(0,0,0,0.7)',
+                color: '#fff',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                zIndex: 5,
+                backdropFilter: 'blur(4px)'
+              }}>
                 {currentMediaIndex + 1} / {allMedia.length}
               </div>
               
               {showSwipeHint && allMedia.length > 1 && (
-                <div className="swipe-hint">
+                <div className="swipe-hint" style={{
+                  position: 'absolute',
+                  bottom: '100px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(0,0,0,0.7)',
+                  color: '#fff',
+                  padding: '8px 20px',
+                  borderRadius: '20px',
+                  fontSize: '14px',
+                  zIndex: 5,
+                  backdropFilter: 'blur(4px)',
+                  animation: 'fadeInOut 5s ease-in-out forwards',
+                  whiteSpace: 'nowrap'
+                }}>
                   ← Swipe to browse →
                 </div>
               )}
               
-              <div className="swipe-dots">
+              <div className="swipe-dots" style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '8px',
+                marginTop: '12px',
+                position: 'absolute',
+                bottom: '12px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 5
+              }}>
                 {allMedia.map((_, index) => (
                   <span 
                     key={index} 
@@ -1070,12 +1207,27 @@ function ProductPage({
                       e.stopPropagation();
                       setCurrentMediaIndex(index);
                     }}
+                    style={{
+                      width: index === currentMediaIndex ? '20px' : '8px',
+                      height: '8px',
+                      borderRadius: index === currentMediaIndex ? '4px' : '50%',
+                      background: index === currentMediaIndex ? '#D4AF37' : 'rgba(255,255,255,0.4)',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
                   />
                 ))}
               </div>
             </div>
             
-            <div className="thumbnail-list">
+            <div className="thumbnail-list" style={{
+              display: 'flex',
+              gap: '10px',
+              overflowX: 'auto',
+              padding: '5px 0',
+              scrollBehavior: 'smooth',
+              WebkitOverflowScrolling: 'touch'
+            }}>
               {allMedia.map((media, index) => {
                 const isVideo = isVideoUrl(media);
                 const isActive = currentMediaIndex === index;
@@ -1090,6 +1242,20 @@ function ProductPage({
                         setSelectedImage(media);
                       }
                     }}
+                    style={{
+                      position: 'relative',
+                      overflow: 'hidden',
+                      borderRadius: '8px',
+                      transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                      border: isActive ? '2px solid #D4AF37' : '2px solid transparent',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      width: '80px',
+                      height: '80px',
+                      background: isDarkMode ? '#1a1a1a' : '#f0e8ed',
+                      transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                      boxShadow: isActive ? '0 0 20px rgba(212, 175, 55, 0.2)' : 'none'
+                    }}
                   >
                     {isVideo ? (
                       <>
@@ -1097,6 +1263,7 @@ function ProductPage({
                           <img 
                             src={`https://img.youtube.com/vi/${media.split('v=')[1]?.split('&')[0] || ''}/mqdefault.jpg`}
                             alt={`Video ${index + 1}`}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             onError={(e) => {
                               e.target.style.display = 'none';
                             }}
@@ -1105,6 +1272,7 @@ function ProductPage({
                           <img 
                             src={`https://img.youtube.com/vi/${media.split('/').pop().split('?')[0]}/mqdefault.jpg`}
                             alt={`Video ${index + 1}`}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             onError={(e) => {
                               e.target.style.display = 'none';
                             }}
@@ -1122,12 +1290,37 @@ function ProductPage({
                             🎬
                           </div>
                         )}
-                        <span className="video-badge">▶</span>
+                        <span className="video-badge" style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          fontSize: '32px',
+                          color: '#fff',
+                          textShadow: '0 2px 12px rgba(0,0,0,0.9)',
+                          pointerEvents: 'none',
+                          zIndex: 3,
+                          opacity: 0.9
+                        }}>▶</span>
                       </>
                     ) : (
-                      <img src={media} alt={`Media ${index + 1}`} />
+                      <img src={media} alt={`Media ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     )}
-                    <span className="media-index">{index + 1}</span>
+                    <span className="media-index" style={{
+                      position: 'absolute',
+                      bottom: '4px',
+                      right: '6px',
+                      fontSize: '10px',
+                      fontWeight: '600',
+                      color: 'rgba(255,255,255,0.8)',
+                      background: 'rgba(0,0,0,0.6)',
+                      padding: '1px 8px',
+                      borderRadius: '10px',
+                      backdropFilter: 'blur(4px)',
+                      zIndex: 4
+                    }}>
+                      {index + 1}
+                    </span>
                   </div>
                 );
               })}
@@ -1138,46 +1331,84 @@ function ProductPage({
           <motion.div 
             className="product-details-section"
             variants={fadeInUp}
+            style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
           >
-            <h1 className="product-title">{product.name}</h1>
-            <p className="product-id">Product ID: {product.productId || 'N/A'}</p>
+            <h1 className="product-title" style={{ 
+              fontSize: '28px', 
+              fontWeight: '700', 
+              margin: 0, 
+              lineHeight: '1.2',
+              color: themeStyles.color
+            }}>
+              {product.name}
+            </h1>
+            <p className="product-id" style={{ fontSize: '12px', color: themeStyles.textMuted }}>
+              Product ID: {product.productId || 'N/A'}
+            </p>
 
             {/* Items Sold Counter */}
-            <div className="product-sold-counter">
-              <span className="sold-icon">📦</span>
-              <span className="sold-text">{totalSold} items sold</span>
+            <div className="product-sold-counter" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+              <span className="sold-icon" style={{ fontSize: '16px' }}>📦</span>
+              <span className="sold-text" style={{ color: themeStyles.textSecondary, fontSize: '14px' }}>
+                {totalSold} items sold
+              </span>
             </div>
 
             {/* Rating */}
-            <div className="product-rating">
+            <div className="product-rating" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <RatingStars rating={reviewStats.average} totalReviews={reviewStats.total} />
             </div>
 
-            <div className="product-price">
+            <div className="product-price" style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '15px', 
+              fontSize: '24px', 
+              padding: '10px 0' 
+            }}>
               {hasSale ? (
                 <>
-                  <span className="original-price">₹{product.price}</span>
-                  <span className="sale-price">₹{product.salePrice}</span>
-                  <span className="discount-badge">Save {discountPercent}%</span>
+                  <span className="original-price" style={{ textDecoration: 'line-through', color: themeStyles.textMuted, fontSize: '18px' }}>
+                    ₹{product.price}
+                  </span>
+                  <span className="sale-price" style={{ color: '#ff4444', fontWeight: 'bold' }}>
+                    ₹{product.salePrice}
+                  </span>
+                  <span className="discount-badge" style={{
+                    background: '#ff4444',
+                    color: '#fff',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: '600'
+                  }}>
+                    Save {discountPercent}%
+                  </span>
                 </>
               ) : (
-                <span className="regular-price">₹{product.price}</span>
+                <span className="regular-price" style={{ fontWeight: 'bold', color: themeStyles.color }}>
+                  ₹{product.price}
+                </span>
               )}
               {variantDetails.price > 0 && product.salePrice && (
-                <span className="variant-price-note">+ ₹{variantDetails.price} for selected variants</span>
+                <span className="variant-price-note" style={{ fontSize: '14px', color: themeStyles.textMuted }}>
+                  + ₹{variantDetails.price} for selected variants
+                </span>
               )}
             </div>
 
             {/* Stock Warning */}
             <StockWarning stock={variantDetails.stock || product.stock} />
 
-            {/* Dynamic Variants - Only show if variants exist */}
+            {/* Dynamic Variants */}
             {product.variants && product.variants.length > 0 ? (
-              <div className="dynamic-variant-section">
+              <div className="dynamic-variant-section" style={{ marginBottom: '16px' }}>
                 {product.variants.map((variant, vIndex) => (
-                  <div key={vIndex} className="dynamic-variant-section">
-                    <label>{variant.name || variant.type}:</label>
-                    <div className="dynamic-variant-options">
+                  <div key={vIndex} className="dynamic-variant-section" style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontWeight: '500', fontSize: '14px', marginBottom: '8px', color: themeStyles.textSecondary }}>
+                      {variant.name || variant.type}:
+                    </label>
+                    <div className="dynamic-variant-options" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                       {variant.options.map((option, oIndex) => {
                         const isSelected = selectedVariant[variant.type || variant.name] === option.value;
                         const isOutOfStock = (option.stock || 0) === 0;
@@ -1193,31 +1424,52 @@ function ProductPage({
                               }
                             }}
                             disabled={isOutOfStock}
+                            style={{
+                              background: isSelected ? '#D4AF37' : isDarkMode ? '#222' : '#f0e8ed',
+                              border: isSelected ? '1px solid #D4AF37' : isDarkMode ? '1px solid #333' : '1px solid #e8e0e5',
+                              color: isSelected ? '#000' : themeStyles.color,
+                              padding: '10px 20px',
+                              borderRadius: '8px',
+                              cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                              transition: 'all 0.3s ease',
+                              fontSize: '14px',
+                              position: 'relative',
+                              opacity: isOutOfStock ? 0.5 : 1
+                            }}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
                             {option.value}
                             {priceDiff > 0 && (
-                              <span className="variant-price">+₹{priceDiff}</span>
+                              <span className="variant-price" style={{ fontSize: '11px', color: themeStyles.textMuted, marginLeft: '4px' }}>
+                                +₹{priceDiff}
+                              </span>
                             )}
                             {option.stock !== undefined && option.stock <= 10 && option.stock > 0 && (
-                              <span className="variant-stock-badge">⚡{option.stock}</span>
+                              <span className="variant-stock-badge" style={{
+                                fontSize: '10px',
+                                background: 'rgba(255,255,255,0.1)',
+                                padding: '1px 8px',
+                                borderRadius: '10px',
+                                marginLeft: '6px'
+                              }}>
+                                ⚡{option.stock}
+                              </span>
                             )}
                           </button>
                         );
                       })}
                     </div>
-                    {/* Stock info for selected variant */}
                     {selectedVariant[variant.type || variant.name] && (
-                      <div className="variant-stock-info">
+                      <div className="variant-stock-info" style={{ fontSize: '13px', color: themeStyles.textMuted, marginTop: '4px' }}>
                         {variant.options.find(o => o.value === selectedVariant[variant.type || variant.name])?.stock > 0 ? (
                           variant.options.find(o => o.value === selectedVariant[variant.type || variant.name])?.stock <= 10 ? (
-                            <span className="low-stock">⚡ Only {variant.options.find(o => o.value === selectedVariant[variant.type || variant.name])?.stock} left!</span>
+                            <span className="low-stock" style={{ color: '#ff8800' }}>⚡ Only {variant.options.find(o => o.value === selectedVariant[variant.type || variant.name])?.stock} left!</span>
                           ) : (
-                            <span className="in-stock">✅ In Stock</span>
+                            <span className="in-stock" style={{ color: '#28a745' }}>✅ In Stock</span>
                           )
                         ) : (
-                          <span className="out-of-stock">❌ Out of Stock</span>
+                          <span className="out-of-stock" style={{ color: '#ff4444' }}>❌ Out of Stock</span>
                         )}
                       </div>
                     )}
@@ -1225,35 +1477,76 @@ function ProductPage({
                 ))}
               </div>
             ) : (
-              // No variants - show simple stock
-              <div className="variant-stock-info">
+              <div className="variant-stock-info" style={{ fontSize: '13px', color: themeStyles.textMuted }}>
                 {product.stock > 0 ? (
                   product.stock <= 10 ? (
-                    <span className="low-stock">⚡ Only {product.stock} left!</span>
+                    <span className="low-stock" style={{ color: '#ff8800' }}>⚡ Only {product.stock} left!</span>
                   ) : (
-                    <span className="in-stock">✅ In Stock</span>
+                    <span className="in-stock" style={{ color: '#28a745' }}>✅ In Stock</span>
                   )
                 ) : (
-                  <span className="out-of-stock">❌ Out of Stock</span>
+                  <span className="out-of-stock" style={{ color: '#ff4444' }}>❌ Out of Stock</span>
                 )}
               </div>
             )}
 
-            <div className="quantity-section">
-              <label>Quantity:</label>
-              <div className="quantity-control">
-                <motion.button onClick={() => handleQuantityChange(displayQuantity - 1)} whileTap={{ scale: 0.8 }}>−</motion.button>
-                <span>{displayQuantity}</span>
-                <motion.button onClick={() => handleQuantityChange(displayQuantity + 1)} whileTap={{ scale: 0.8 }}>+</motion.button>
+            <div className="quantity-section" style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+              <label style={{ fontWeight: '500', fontSize: '14px', color: themeStyles.textSecondary }}>Quantity:</label>
+              <div className="quantity-control" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '15px',
+                background: isDarkMode ? '#222' : '#f0e8ed',
+                borderRadius: '8px',
+                padding: '5px 15px',
+                border: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5'
+              }}>
+                <motion.button 
+                  onClick={() => handleQuantityChange(displayQuantity - 1)} 
+                  whileTap={{ scale: 0.8 }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: themeStyles.color,
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    padding: '5px 10px',
+                    transition: 'all 0.3s ease'
+                  }}
+                >−</motion.button>
+                <span style={{ fontSize: '18px', minWidth: '30px', textAlign: 'center', fontWeight: '600', color: themeStyles.color }}>
+                  {displayQuantity}
+                </span>
+                <motion.button 
+                  onClick={() => handleQuantityChange(displayQuantity + 1)} 
+                  whileTap={{ scale: 0.8 }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: themeStyles.color,
+                    fontSize: '20px',
+                    cursor: 'pointer',
+                    padding: '5px 10px',
+                    transition: 'all 0.3s ease'
+                  }}
+                >+</motion.button>
               </div>
               {isInCart && (
-                <span className="cart-quantity-indicator">
+                <span className="cart-quantity-indicator" style={{
+                  fontSize: '13px',
+                  color: '#D4AF37',
+                  background: 'rgba(212, 175, 55, 0.1)',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(212, 175, 55, 0.2)',
+                  whiteSpace: 'nowrap'
+                }}>
                   🛒 {cartQuantity} in cart
                 </span>
               )}
             </div>
 
-            <div className="action-buttons-main">
+            <div className="action-buttons-main" style={{ display: 'flex', gap: '15px' }}>
               <motion.button 
                 className="add-to-cart-btn" 
                 onClick={(e) => {
@@ -1261,11 +1554,25 @@ function ProductPage({
                   handleAddToCart();
                 }}
                 disabled={isVariantOutOfStock || product.stock === 0}
-                style={{ opacity: (isVariantOutOfStock || product.stock === 0) ? '0.5' : '1' }}
+                style={{
+                  flex: 2,
+                  background: '#D4AF37',
+                  color: '#000',
+                  border: 'none',
+                  padding: '14px 20px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  borderRadius: '8px',
+                  cursor: isVariantOutOfStock || product.stock === 0 ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  opacity: (isVariantOutOfStock || product.stock === 0) ? 0.5 : 1
+                }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <span className="btn-content">
+                <span className="btn-content" style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
                   <span className="btn-icon">🛒</span>
                   {isVariantOutOfStock || product.stock === 0 ? 'Out of Stock' : (isInCart ? '🔄 Update Cart' : 'Add to Cart')}
                 </span>
@@ -1274,7 +1581,19 @@ function ProductPage({
                 className="buy-now-btn" 
                 onClick={handleBuyNow}
                 disabled={isVariantOutOfStock || product.stock === 0}
-                style={{ opacity: (isVariantOutOfStock || product.stock === 0) ? '0.5' : '1' }}
+                style={{
+                  flex: 1,
+                  background: themeStyles.color === '#ffffff' ? '#fff' : '#222',
+                  color: themeStyles.color === '#ffffff' ? '#000' : '#fff',
+                  border: 'none',
+                  padding: '14px 20px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  borderRadius: '8px',
+                  cursor: isVariantOutOfStock || product.stock === 0 ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                  opacity: (isVariantOutOfStock || product.stock === 0) ? 0.5 : 1
+                }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -1282,10 +1601,20 @@ function ProductPage({
               </motion.button>
             </div>
 
-            <div className="action-buttons-secondary">
+            <div className="action-buttons-secondary" style={{ display: 'flex', gap: '15px' }}>
               <motion.button 
                 className={`wishlist-btn ${isInWishlist ? 'active' : ''}`}
                 onClick={(e) => toggleWishlistWithHeart(product._id, e)}
+                style={{
+                  flex: 1,
+                  background: isDarkMode ? '#222' : '#f0e8ed',
+                  border: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5',
+                  color: isInWishlist ? '#ff4444' : themeStyles.color,
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -1294,6 +1623,16 @@ function ProductPage({
               <motion.button 
                 className="share-btn" 
                 onClick={shareProduct}
+                style={{
+                  flex: 1,
+                  background: isDarkMode ? '#222' : '#f0e8ed',
+                  border: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5',
+                  color: themeStyles.color,
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -1301,42 +1640,75 @@ function ProductPage({
               </motion.button>
             </div>
 
-            <div className="delivery-info">
-              <p>🚚 Free delivery on orders above ₹999</p>
-              <p>🔄 14-day return policy</p>
+            <div className="delivery-info" style={{
+              background: isDarkMode ? '#111' : '#fff',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: isDarkMode ? '1px solid #222' : '1px solid #e8e0e5'
+            }}>
+              <p style={{ margin: '4px 0', fontSize: '14px', color: themeStyles.textSecondary }}>🚚 Free delivery on orders above ₹999</p>
+              <p style={{ margin: '4px 0', fontSize: '14px', color: themeStyles.textSecondary }}>🔄 14-day return policy</p>
             </div>
 
-            <div className="product-description">
-              <h3>Description</h3>
-              <p>{product.description || 'Premium quality product.'}</p>
+            <div className="product-description" style={{ marginTop: '16px' }}>
+              <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#D4AF37' }}>Description</h3>
+              <p style={{ color: themeStyles.textSecondary, lineHeight: '1.6' }}>
+                {product.description || 'Premium quality product.'}
+              </p>
             </div>
 
-            {/* Product Specs - Dynamic */}
-            <div className="product-specs">
-              <h3>Product Details</h3>
-              <table>
+            {/* Product Specs */}
+            <div className="product-specs" style={{ marginTop: '16px' }}>
+              <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#D4AF37' }}>Product Details</h3>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <tbody>
-                  <tr><td>Product ID</td><td>{product.productId || 'N/A'}</td></tr>
-                  <tr><td>Category</td><td>
-                    {product.categories && product.categories.length > 0 ? (
-                      product.categories.map(cat => cat.name || cat).join(', ')
-                    ) : (
-                      product.category || 'Uncategorized'
-                    )}
-                  </td></tr>
-                  <tr><td>Color</td><td>{selectedColor || product.color || 'Black'}</td></tr>
+                  <tr>
+                    <td style={{ padding: '8px 0', borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5', color: themeStyles.textMuted, width: '40%' }}>
+                      Product ID
+                    </td>
+                    <td style={{ padding: '8px 0', borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5', color: themeStyles.color }}>
+                      {product.productId || 'N/A'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '8px 0', borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5', color: themeStyles.textMuted }}>
+                      Category
+                    </td>
+                    <td style={{ padding: '8px 0', borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5', color: themeStyles.color }}>
+                      {product.categories && product.categories.length > 0 ? (
+                        product.categories.map(cat => cat.name || cat).join(', ')
+                      ) : (
+                        product.category || 'Uncategorized'
+                      )}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '8px 0', borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5', color: themeStyles.textMuted }}>
+                      Color
+                    </td>
+                    <td style={{ padding: '8px 0', borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5', color: themeStyles.color }}>
+                      {selectedColor || product.color || 'Black'}
+                    </td>
+                  </tr>
                   {product.variants && product.variants.some(v => v.type === 'Size' || v.name === 'Size') && (
-                    <tr><td>Size</td><td>{selectedSize || product.size || 'M'}</td></tr>
+                    <tr>
+                      <td style={{ padding: '8px 0', borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5', color: themeStyles.textMuted }}>
+                        Size
+                      </td>
+                      <td style={{ padding: '8px 0', borderBottom: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5', color: themeStyles.color }}>
+                        {selectedSize || product.size || 'M'}
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
             </div>
 
             {/* Reviews Section */}
-            <div className="reviews-section">
-              <div className="reviews-header">
-                <h3>Customer Reviews</h3>
-                <div className="reviews-summary">
+            <div className="reviews-section" style={{ marginTop: '20px', paddingTop: '20px', borderTop: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5' }}>
+              <div className="reviews-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <h3 style={{ fontSize: '16px', marginBottom: '10px', color: '#D4AF37' }}>Customer Reviews</h3>
+                <div className="reviews-summary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <RatingStars rating={reviewStats.average} totalReviews={reviewStats.total} />
                 </div>
               </div>
@@ -1345,24 +1717,38 @@ function ProductPage({
                 <motion.button 
                   className="write-review-btn"
                   onClick={() => setShowReviewModal(true)}
+                  style={{
+                    background: isDarkMode ? '#222' : '#f0e8ed',
+                    border: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5',
+                    color: themeStyles.color,
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    marginTop: '10px',
+                    transition: 'all 0.3s ease'
+                  }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   ✏️ Write a Review
                 </motion.button>
               ) : reviewLoading ? (
-                <p className="review-loading">Checking review eligibility...</p>
+                <p className="review-loading" style={{ color: themeStyles.textMuted, fontSize: '14px' }}>
+                  Checking review eligibility...
+                </p>
               ) : (
-                <p className="no-reviews">
+                <p className="no-reviews" style={{ color: themeStyles.textMuted, fontSize: '14px' }}>
                   {localStorage.getItem('loop_token') 
                     ? 'You can review this product after purchasing it.' 
                     : 'Login to write a review.'}
                 </p>
               )}
 
-              <div className="reviews-list">
+              <div className="reviews-list" style={{ marginTop: '16px' }}>
                 {reviews.length === 0 ? (
-                  <p className="no-reviews">No reviews yet. Be the first to review this product!</p>
+                  <p className="no-reviews" style={{ color: themeStyles.textMuted, fontSize: '14px' }}>
+                    No reviews yet. Be the first to review this product!
+                  </p>
                 ) : (
                   reviews.slice(0, 5).map(review => (
                     <motion.div 
@@ -1372,48 +1758,96 @@ function ProductPage({
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3 }}
                       whileHover={{ x: 4 }}
+                      style={{
+                        background: isDarkMode ? '#111' : '#fff',
+                        borderRadius: '12px',
+                        padding: '16px 20px',
+                        marginBottom: '12px',
+                        border: isDarkMode ? '1px solid #222' : '1px solid #e8e0e5',
+                        transition: 'all 0.3s ease'
+                      }}
                     >
-                      <div className="review-header">
-                        <div className="review-user">
-                          <span className="review-avatar">
+                      <div className="review-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '8px' }}>
+                        <div className="review-user" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="review-avatar" style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: '#D4AF37',
+                            color: '#000',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            fontSize: '14px',
+                            flexShrink: 0
+                          }}>
                             {review.userId?.name?.charAt(0)?.toUpperCase() || 'U'}
                           </span>
-                          <span className="review-name">{review.userId?.name || 'Anonymous'}</span>
+                          <span className="review-name" style={{ fontWeight: '500', fontSize: '14px', color: themeStyles.color }}>
+                            {review.userId?.name || 'Anonymous'}
+                          </span>
                           {review.isVerified && (
-                            <span className="review-verified">✅ Verified Purchase</span>
+                            <span className="review-verified" style={{
+                              color: '#28a745',
+                              fontSize: '11px',
+                              background: 'rgba(40, 167, 69, 0.1)',
+                              padding: '2px 8px',
+                              borderRadius: '12px'
+                            }}>
+                              ✅ Verified Purchase
+                            </span>
                           )}
                         </div>
-                        <span className="review-date">
+                        <span className="review-date" style={{ color: themeStyles.textMuted, fontSize: '12px' }}>
                           {new Date(review.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                       <RatingStars rating={review.rating} showCount={false} size="small" />
-                      {review.title && <p className="review-title">{review.title}</p>}
-                      <p className="review-comment">{review.comment}</p>
+                      {review.title && <p className="review-title" style={{ fontWeight: '600', fontSize: '14px', margin: '4px 0', color: themeStyles.color }}>
+                        {review.title}
+                      </p>}
+                      <p className="review-comment" style={{ color: themeStyles.textSecondary, fontSize: '14px', lineHeight: '1.5', margin: '4px 0 0' }}>
+                        {review.comment}
+                      </p>
                     </motion.div>
                   ))
                 )}
                 {reviews.length > 5 && (
-                  <button className="view-all-reviews">View all {reviews.length} reviews</button>
+                  <button className="view-all-reviews" style={{
+                    background: 'none',
+                    border: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5',
+                    color: '#D4AF37',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    marginTop: '10px'
+                  }}>
+                    View all {reviews.length} reviews
+                  </button>
                 )}
               </div>
             </div>
           </motion.div>
         </motion.div>
 
+        {/* Similar Products */}
         {similarProducts.length > 0 && (
           <motion.div 
             className="similar-products"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
+            style={{ padding: '40px 0 60px', borderTop: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5' }}
           >
-            <h3>Similar Products</h3>
+            <h3 style={{ fontSize: '16px', marginBottom: '20px', color: '#D4AF37' }}>Similar Products</h3>
             <motion.div 
               className="similar-grid"
               variants={staggerContainer}
               initial="hidden"
               animate="visible"
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '20px' }}
             >
               {similarProducts.map(p => (
                 <motion.div
@@ -1422,10 +1856,39 @@ function ProductPage({
                   whileHover={{ y: -6, scale: 1.02 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <Link to={`/product/${p.productId || p.name.toLowerCase().replace(/ /g, '-')}`} className="similar-card">
-                    <img src={p.image || 'https://via.placeholder.com/150x150?text=LOOP'} alt={p.name} />
-                    <p className="similar-name">{p.name}</p>
-                    <p className="similar-price">₹{p.price}</p>
+                  <Link 
+                    to={`/product/${p.productId || p.name.toLowerCase().replace(/ /g, '-')}`} 
+                    className="similar-card"
+                    style={{
+                      background: isDarkMode ? '#111' : '#fff',
+                      borderRadius: '8px',
+                      padding: '15px',
+                      textAlign: 'center',
+                      border: isDarkMode ? '1px solid #222' : '1px solid #e8e0e5',
+                      transition: 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                      textDecoration: 'none',
+                      color: themeStyles.color,
+                      cursor: 'pointer',
+                      display: 'block'
+                    }}
+                  >
+                    <img 
+                      src={p.image || 'https://via.placeholder.com/150x150?text=LOOP'} 
+                      alt={p.name} 
+                      style={{ 
+                        width: '100%', 
+                        height: '180px', 
+                        objectFit: 'cover', 
+                        borderRadius: '4px',
+                        transition: 'transform 0.4s ease'
+                      }}
+                    />
+                    <p className="similar-name" style={{ margin: '10px 0 5px', fontSize: '14px', fontWeight: '500', color: themeStyles.color }}>
+                      {p.name}
+                    </p>
+                    <p className="similar-price" style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 'bold' }}>
+                      ₹{p.price}
+                    </p>
                   </Link>
                 </motion.div>
               ))}
@@ -1445,17 +1908,52 @@ function ProductPage({
           onTouchMove={handleModalTouchMove}
           onTouchEnd={handleModalTouchEnd}
           ref={modalRef}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            background: 'rgba(0,0,0,0.95)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
         >
           <motion.button 
             className="modal-close" 
             onClick={closeFullscreen}
             whileHover={{ rotate: 90 }}
             transition={{ duration: 0.3 }}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '30px',
+              background: 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: '#fff',
+              fontSize: '28px',
+              padding: '10px 18px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              zIndex: 10,
+              transition: 'all 0.3s ease',
+              backdropFilter: 'blur(4px)'
+            }}
           >
             ✕
           </motion.button>
           
-          <div className="modal-image-container">
+          <div className="modal-image-container" style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
             <MediaRenderer 
               media={allMedia[fullscreenIndex] || allMedia[0]} 
               className="modal-media"
@@ -1469,6 +1967,25 @@ function ProductPage({
                   onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    color: '#fff',
+                    fontSize: '36px',
+                    padding: '20px 15px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    zIndex: 10,
+                    transition: 'all 0.3s ease',
+                    backdropFilter: 'blur(4px)',
+                    left: '20px',
+                    opacity: 0
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
                 >
                   ◀
                 </motion.button>
@@ -1477,20 +1994,60 @@ function ProductPage({
                   onClick={(e) => { e.stopPropagation(); goToNext(); }}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    color: '#fff',
+                    fontSize: '36px',
+                    padding: '20px 15px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    zIndex: 10,
+                    transition: 'all 0.3s ease',
+                    backdropFilter: 'blur(4px)',
+                    right: '20px',
+                    opacity: 0
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
                 >
                   ▶
                 </motion.button>
               </>
             )}
             
-            <div className="modal-image-counter">
+            <div className="modal-image-counter" style={{
+              position: 'absolute',
+              bottom: '30px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(0,0,0,0.7)',
+              color: '#fff',
+              padding: '6px 18px',
+              borderRadius: '20px',
+              fontSize: '14px',
+              zIndex: 10,
+              backdropFilter: 'blur(4px)'
+            }}>
               {fullscreenIndex + 1} / {allMedia.length}
               {allMedia[fullscreenIndex] && 
                 ` - ${isVideoUrl(allMedia[fullscreenIndex]) ? '🎬 Video' : '📸 Image'}`
               }
             </div>
             
-            <div className="modal-swipe-hint">
+            <div className="modal-swipe-hint" style={{
+              position: 'absolute',
+              bottom: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              color: 'rgba(255,255,255,0.5)',
+              fontSize: '14px',
+              zIndex: 5,
+              animation: 'pulseHint 2s ease-in-out infinite'
+            }}>
               ↓ Swipe down to close
               {!isVideoUrl(allMedia[fullscreenIndex]) && ' | Pinch to zoom'}
             </div>

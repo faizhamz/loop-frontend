@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useApp } from '../context/AppContext';
+import WhatsAppIcon from '../components/WhatsAppIcon';
 import './Profile.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
-// ✅ Instagram-Style Gradient Avatars
+// Instagram-Style Gradient Avatars
 const GRADIENT_AVATARS = [
   { id: 'sunset', bg: 'linear-gradient(135deg, #f093fb, #f5576c)', label: 'Sunset' },
   { id: 'ocean', bg: 'linear-gradient(135deg, #4facfe, #00f2fe)', label: 'Ocean' },
@@ -19,10 +20,6 @@ const GRADIENT_AVATARS = [
   { id: 'gold', bg: 'linear-gradient(135deg, #f5f7fa, #c3cfe2)', label: 'Gold' },
   { id: 'forest', bg: 'linear-gradient(135deg, #d4fc79, #96e6a1)', label: 'Forest' },
   { id: 'twilight', bg: 'linear-gradient(135deg, #a18cd1, #fbc2eb)', label: 'Twilight' },
-  { id: 'coral', bg: 'linear-gradient(135deg, #f093fb, #f5576c)', label: 'Coral' },
-  { id: 'moonlight', bg: 'linear-gradient(135deg, #4facfe, #00f2fe)', label: 'Moonlight' },
-  { id: 'spring', bg: 'linear-gradient(135deg, #43e97b, #38f9d7)', label: 'Spring' },
-  { id: 'autumn', bg: 'linear-gradient(135deg, #fa709a, #fee140)', label: 'Autumn' },
 ];
 
 function Profile({ user, setUser, showToast }) {
@@ -31,6 +28,7 @@ function Profile({ user, setUser, showToast }) {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [recentOrders, setRecentOrders] = useState([]);
   const [selectedGradient, setSelectedGradient] = useState(null);
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const avatarPickerRef = useRef(null);
   
   const [formData, setFormData] = useState({
@@ -96,7 +94,31 @@ function Profile({ user, setUser, showToast }) {
         }
       }
     }
+
+    // Fetch WhatsApp number
+    fetchWhatsAppNumber();
   }, [user]);
+
+  const fetchWhatsAppNumber = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/contact`);
+      if (response.data?.whatsapp) {
+        setWhatsappNumber(response.data.whatsapp);
+      }
+    } catch (err) {
+      console.error('Error fetching WhatsApp:', err);
+    }
+  };
+
+  const openWhatsApp = () => {
+    if (!whatsappNumber) {
+      alert('WhatsApp support number not available.');
+      return;
+    }
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    const message = `Hi LOOP Team, I need help with my account.`;
+    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank');
+  };
 
   // Click outside avatar picker to close
   useEffect(() => {
@@ -157,6 +179,9 @@ function Profile({ user, setUser, showToast }) {
       setUser(updatedUser);
       localStorage.setItem('loop_user', JSON.stringify(updatedUser));
       
+      // Dispatch event for sidebar update
+      window.dispatchEvent(new Event('userUpdated'));
+      
       showToast('✅ Profile updated successfully!', 'success');
       setEditing(false);
     } catch (err) {
@@ -167,7 +192,6 @@ function Profile({ user, setUser, showToast }) {
     }
   };
 
-  // ✅ Toggle edit mode
   const toggleEdit = () => {
     setEditing(!editing);
     if (!editing && user) {
@@ -221,7 +245,6 @@ function Profile({ user, setUser, showToast }) {
     });
   };
 
-  // Render avatar with gradient background
   const renderAvatar = () => {
     const bg = formData.avatarBg || 'linear-gradient(135deg, #D4AF37, #FFB7C5)';
     const text = formData.avatar || (formData.name ? formData.name.charAt(0).toUpperCase() : '👤');
@@ -257,7 +280,7 @@ function Profile({ user, setUser, showToast }) {
   return (
     <div className="profile-page-modern">
       <div className="container">
-        {/* Profile Header - NO EDIT BUTTON HERE */}
+        {/* Profile Header */}
         <div className="profile-header-modern">
           <div className="profile-cover"></div>
           <div className="profile-info-row">
@@ -384,10 +407,112 @@ function Profile({ user, setUser, showToast }) {
               <span className="action-icon">📍</span>
               <span className="action-label">Addresses</span>
             </a>
-            <a href="/contact" className="quick-action-item">
-              <span className="action-icon">💬</span>
-              <span className="action-label">Support</span>
-            </a>
+            {whatsappNumber && (
+              <button onClick={openWhatsApp} className="quick-action-item" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                <span className="action-icon"><WhatsAppIcon size={24} /></span>
+                <span className="action-label" style={{ color: '#25D366' }}>WhatsApp</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 🎯 REFERRAL SECTION */}
+        <div className="quick-actions-modern" style={{ marginTop: '20px' }}>
+          <div className="section-header">
+            <h3>🎯 Refer & Earn</h3>
+            <a href="/referral" className="view-all-link">View Details →</a>
+          </div>
+          
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.05), rgba(255, 183, 197, 0.05))',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            border: '1px solid rgba(212, 175, 55, 0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '12px', color: '#888' }}>Your Referral Code</div>
+                <div style={{ 
+                  fontSize: '20px', 
+                  fontWeight: 'bold', 
+                  color: '#D4AF37',
+                  fontFamily: 'monospace',
+                  letterSpacing: '1px'
+                }}>
+                  {user?.referralCode || 'Loading...'}
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}?ref=${user?.referralCode}`;
+                    navigator.clipboard.writeText(link);
+                    showToast?.('📋 Referral link copied!', 'success');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#D4AF37',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: '#000',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '13px'
+                  }}
+                >
+                  📋 Copy Link
+                </button>
+                
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}?ref=${user?.referralCode}`;
+                    const text = `🎉 Join LOOP and get ₹50 bonus! Use my referral link: ${link}`;
+                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    background: '#25D366',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '13px'
+                  }}
+                >
+                  💬 Share
+                </button>
+              </div>
+            </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '20px', 
+              marginTop: '12px',
+              paddingTop: '12px',
+              borderTop: '1px solid rgba(212, 175, 55, 0.1)',
+              flexWrap: 'wrap'
+            }}>
+              <div>
+                <span style={{ fontSize: '11px', color: '#888' }}>Total Referrals</span>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff' }}>
+                  {user?.referrals?.length || 0}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '11px', color: '#888' }}>Total Earned</span>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#D4AF37' }}>
+                  ₹{user?.referrals?.filter(r => r.status === 'paid').reduce((sum, r) => sum + r.rewardAmount, 0) || 0}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: '11px', color: '#888' }}>Pending</span>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ff8800' }}>
+                  ₹{user?.referrals?.filter(r => r.status === 'pending').reduce((sum, r) => sum + r.rewardAmount, 0) || 0}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -429,13 +554,10 @@ function Profile({ user, setUser, showToast }) {
           </div>
         )}
 
-        {/* ============================================================
-            👤 PERSONAL INFORMATION - ONLY EDIT BUTTON HERE
-            ============================================================ */}
+        {/* Personal Information */}
         <div className="profile-edit-section">
           <div className="section-header">
             <h3>👤 Personal Information</h3>
-            {/* ✅ ONLY ONE EDIT BUTTON - RIGHT HERE */}
             {!editing && (
               <button 
                 className="edit-profile-btn-small"
@@ -544,7 +666,6 @@ function Profile({ user, setUser, showToast }) {
               </div>
             </div>
 
-            {/* Form Actions - Show when editing */}
             {editing && (
               <div className="form-actions-modern">
                 <button type="submit" disabled={loading} className="save-btn-modern">
@@ -562,7 +683,7 @@ function Profile({ user, setUser, showToast }) {
           </form>
         </div>
 
-        {/* Help Section */}
+        {/* Help Section with WhatsApp */}
         <div className="help-section-modern">
           <div className="help-content">
             <span className="help-icon">💬</span>
@@ -570,7 +691,29 @@ function Profile({ user, setUser, showToast }) {
               <h4>Need Help?</h4>
               <p>Our support team is here to assist you</p>
             </div>
-            <a href="/contact" className="help-btn">Contact Support →</a>
+            {whatsappNumber ? (
+              <button 
+                onClick={openWhatsApp}
+                style={{
+                  padding: '10px 24px',
+                  background: '#25D366',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px'
+                }}
+              >
+                <WhatsAppIcon size={20} color="#fff" />
+                Chat Now
+              </button>
+            ) : (
+              <a href="/contact" className="help-btn">Contact Support →</a>
+            )}
           </div>
         </div>
       </div>

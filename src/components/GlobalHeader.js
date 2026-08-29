@@ -1,8 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
 import { useApp } from '../context/AppContext';
 import SidebarMenu from './SidebarMenu';
+import WhatsAppIcon from './WhatsAppIcon';
+
+const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
 function GlobalHeader({ 
   cart, 
@@ -18,6 +22,7 @@ function GlobalHeader({
   const [searchInput, setSearchInput] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const location = useLocation();
   const { 
     searchResults, 
@@ -39,12 +44,34 @@ function GlobalHeader({
   // Check if we're on admin page
   const isAdminPage = location.pathname.startsWith('/admin');
 
-  // ✅ If admin page, return NOTHING (no header at all)
+  // Fetch WhatsApp number
+  useEffect(() => {
+    const fetchWhatsApp = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/contact`);
+        if (response.data?.whatsapp) {
+          setWhatsappNumber(response.data.whatsapp);
+        }
+      } catch (err) {
+        console.error('Error fetching WhatsApp:', err);
+      }
+    };
+    fetchWhatsApp();
+  }, []);
+
+  const openWhatsApp = () => {
+    if (!whatsappNumber) return;
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    const message = `Hi LOOP Team, I need help!`;
+    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  // If admin page, return nothing
   if (isAdminPage) {
     return null;
   }
 
-  // ✅ Scroll effect for shadow
+  // Scroll effect
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 10);
@@ -83,7 +110,7 @@ function GlobalHeader({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Keyboard shortcut: Ctrl+K or Cmd+K for search
+  // Keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
@@ -102,9 +129,6 @@ function GlobalHeader({
 
   const totalCartItems = cart.reduce((s, i) => s + i.quantity, 0);
 
-  // ============================================
-  // CUSTOMER HEADER - Full UI
-  // ============================================
   return (
     <header className={`header ${scrolled ? 'header-scrolled' : ''}`}>
       <div className="container header-content">
@@ -127,11 +151,7 @@ function GlobalHeader({
               type="text"
               placeholder="Search products..."
               value={searchInput}
-              onChange={(e) => {
-                setSearchInput(e.target.value);
-                performSearch(e.target.value, products);
-                setIsSearchOpen(true);
-              }}
+              onChange={handleSearch}
               onFocus={() => setIsSearchOpen(true)}
               className="header-search-input"
             />
@@ -173,6 +193,32 @@ function GlobalHeader({
 
         {/* Right: Icons */}
         <div className="header-right">
+          {/* WhatsApp Support Button */}
+          {whatsappNumber && (
+            <button
+              onClick={openWhatsApp}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(37, 211, 102, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+              title="Chat on WhatsApp"
+            >
+              <WhatsAppIcon size={24} />
+            </button>
+          )}
+
           <Link to="/wishlist" className="wishlist-heart-link desktop-only" aria-label="Wishlist">
             ❤️
             {wishlist.length > 0 && (

@@ -88,7 +88,7 @@ function ReferralPanel() {
         padding: '10px 0',
         borderBottom: '1px solid #333'
       }}>
-        <h2>🎯 Referral Program</h2>
+        <h2 style={{ color: '#fff' }}>🎯 Referral Program</h2>
         <span style={{ 
           padding: '4px 12px', 
           borderRadius: '20px',
@@ -121,20 +121,20 @@ function ReferralPanel() {
           marginBottom: '25px'
         }}>
           <div className="stat-card">
-            <h3>{analytics.stats?.totalReferrals || 0}</h3>
-            <p>Total Referrals</p>
+            <h3 style={{ color: '#D4AF37' }}>{analytics.stats?.totalReferrals || 0}</h3>
+            <p style={{ color: '#888' }}>Total Referrals</p>
           </div>
           <div className="stat-card">
-            <h3>₹{analytics.stats?.totalEarned || 0}</h3>
-            <p>Total Paid Out</p>
+            <h3 style={{ color: '#D4AF37' }}>₹{analytics.stats?.totalEarned || 0}</h3>
+            <p style={{ color: '#888' }}>Total Paid Out</p>
           </div>
           <div className="stat-card">
-            <h3>{analytics.stats?.pendingReferrals || 0}</h3>
-            <p>Pending</p>
+            <h3 style={{ color: '#ff8800' }}>{analytics.stats?.pendingReferrals || 0}</h3>
+            <p style={{ color: '#888' }}>Pending</p>
           </div>
           <div className="stat-card">
-            <h3>₹{settings.rewardAmount}</h3>
-            <p>Per Referral</p>
+            <h3 style={{ color: '#D4AF37' }}>₹{settings.rewardAmount}</h3>
+            <p style={{ color: '#888' }}>Per Referral</p>
           </div>
         </div>
       )}
@@ -253,7 +253,8 @@ function ReferralPanel() {
             borderRadius: '4px',
             cursor: 'pointer',
             fontWeight: 'bold',
-            fontSize: '16px'
+            fontSize: '16px',
+            color: '#000'
           }}
         >
           {saving ? 'Saving...' : '💾 Save Settings'}
@@ -267,23 +268,23 @@ function ReferralPanel() {
           <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>Rank</th>
-                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>Name</th>
-                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>Referral Code</th>
-                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>Total Referrals</th>
+                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333', color: '#888' }}>Rank</th>
+                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333', color: '#888' }}>Name</th>
+                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333', color: '#888' }}>Referral Code</th>
+                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333', color: '#888' }}>Total Referrals</th>
               </tr>
             </thead>
             <tbody>
               {analytics.topReferrers.map((user, index) => (
                 <tr key={index}>
-                  <td style={{ padding: '10px', borderBottom: '1px solid #222' }}>#{index + 1}</td>
-                  <td style={{ padding: '10px', borderBottom: '1px solid #222' }}>{user.name}</td>
+                  <td style={{ padding: '10px', borderBottom: '1px solid #222', color: '#D4AF37' }}>#{index + 1}</td>
+                  <td style={{ padding: '10px', borderBottom: '1px solid #222', color: '#fff' }}>{user.name}</td>
                   <td style={{ padding: '10px', borderBottom: '1px solid #222' }}>
                     <code style={{ background: '#222', padding: '2px 8px', borderRadius: '4px', color: '#D4AF37' }}>
                       {user.referralCode}
                     </code>
                   </td>
-                  <td style={{ padding: '10px', borderBottom: '1px solid #222' }}>{user.count}</td>
+                  <td style={{ padding: '10px', borderBottom: '1px solid #222', color: '#D4AF37' }}>{user.count}</td>
                 </tr>
               ))}
             </tbody>

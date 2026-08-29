@@ -14,18 +14,64 @@ function SidebarMenu() {
   const navigate = useNavigate();
   const menuRef = useRef(null);
   
-  // ✅ Get theme from context
   const { isDarkMode, toggleTheme } = useApp();
 
-  useEffect(() => {
+  // ✅ Load user data on mount AND when localStorage changes
+  const loadUserData = () => {
     const token = localStorage.getItem('loop_token');
     const userData = localStorage.getItem('loop_user');
+    
+    console.log('🔄 Sidebar loading user data...');
+    
     if (token && userData) {
-      setIsLoggedIn(true);
-      setUser(JSON.parse(userData));
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        setIsLoggedIn(true);
+        console.log('✅ Sidebar user loaded:', parsedUser.name);
+      } catch (e) {
+        console.error('Error parsing user:', e);
+        setIsLoggedIn(false);
+        setUser(null);
+      }
+    } else {
+      setIsLoggedIn(false);
+      setUser(null);
     }
+  };
+
+  useEffect(() => {
+    loadUserData();
     fetchCategories();
+
+    // ✅ Listen for storage changes (when user updates profile)
+    const handleStorageChange = (e) => {
+      if (e.key === 'loop_user' || e.key === 'loop_token') {
+        console.log('🔄 Storage changed, reloading user data...');
+        loadUserData();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // ✅ Listen for custom events (when login/logout happens)
+    const handleUserUpdate = () => {
+      console.log('🔄 User update event received');
+      loadUserData();
+    };
+
+    window.addEventListener('userUpdated', handleUserUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userUpdated', handleUserUpdate);
+    };
   }, []);
+
+  // ✅ Function to refresh user data (call after login/logout)
+  const refreshUser = () => {
+    loadUserData();
+  };
 
   const fetchCategories = async () => {
     try {
@@ -52,12 +98,17 @@ function SidebarMenu() {
     setIsLoggedIn(false);
     setUser(null);
     setIsOpen(false);
+    
+    // ✅ Dispatch event so other components update
+    window.dispatchEvent(new Event('userUpdated'));
+    
     navigate('/');
     window.location.reload();
   };
 
   const menuItems = [
     { icon: '👤', label: 'My Profile', path: '/profile', show: isLoggedIn },
+    { icon: '🎯', label: 'Refer & Earn', path: '/referral', show: isLoggedIn },  // ✅ Added referral
     { icon: '📦', label: 'Order History', path: '/orders', show: true },
     { icon: '🏠', label: 'Saved Addresses', path: '/addresses', show: isLoggedIn },
     { icon: '❤️', label: 'Wishlist', path: '/wishlist', show: true },
