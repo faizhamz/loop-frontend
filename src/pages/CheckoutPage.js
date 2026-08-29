@@ -24,11 +24,7 @@ function CheckoutPage() {
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
-  const [maxDiscountInfo, setMaxDiscountInfo] = useState(null);
   const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [availableCoupons, setAvailableCoupons] = useState([]);
-  const [showAvailableCoupons, setShowAvailableCoupons] = useState(false);
-  const [loadingCoupons, setLoadingCoupons] = useState(false);
   
   // Address States
   const [user, setUser] = useState(null);
@@ -94,21 +90,9 @@ function CheckoutPage() {
     }
     
     fetchActivePayment();
-    fetchAvailableCoupons();
   }, []);
 
-  const fetchAvailableCoupons = async () => {
-    setLoadingCoupons(true);
-    try {
-      const response = await axios.get(`${API_URL}/api/coupons/available`);
-      setAvailableCoupons(response.data || []);
-    } catch (error) {
-      console.error('Error fetching coupons:', error);
-    } finally {
-      setLoadingCoupons(false);
-    }
-  };
-
+  // ✅ FIXED: Calculate totals with coupon
   const calculateTotals = (cartItems) => {
     const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     setSubtotal(subtotal);
@@ -116,15 +100,22 @@ function CheckoutPage() {
     const shipping = subtotal > 999 ? 0 : 60;
     setShippingFee(shipping);
     
+    // Apply coupon discount
     const platform = 0;
     setPlatformFee(platform);
     
     const handling = 0;
     setHandlingFee(handling);
     
+    // ✅ Fixed: Calculate final total correctly
     const total = subtotal + shipping + platform + handling - couponDiscount;
     setFinalTotal(total);
   };
+
+  // ✅ When coupon discount changes, recalculate
+  useEffect(() => {
+    calculateTotals(cart);
+  }, [couponDiscount]);
 
   const fetchActivePayment = async () => {
     try {
@@ -211,7 +202,7 @@ function CheckoutPage() {
     setSelectedAddress(address);
   };
 
-  // ✅ Coupon Functions
+  // ✅ FIXED: Apply Coupon
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
       setCouponError('Please enter a coupon code');
@@ -220,8 +211,6 @@ function CheckoutPage() {
 
     setCouponError('');
     setCouponSuccess('');
-    setCouponDiscount(0);
-    setMaxDiscountInfo(null);
 
     try {
       const token = localStorage.getItem('loop_token');
@@ -237,22 +226,9 @@ function CheckoutPage() {
         const discountAmount = response.data.discountAmount || 0;
         setCouponDiscount(discountAmount);
         setAppliedCoupon(response.data);
-        
-        if (response.data.maxDiscount > 0 && response.data.discountPercent > 0) {
-          setMaxDiscountInfo({
-            maxDiscount: response.data.maxDiscount,
-            discountPercent: response.data.discountPercent,
-            effectiveDiscountPercent: response.data.effectiveDiscountPercent || response.data.discountPercent,
-            maxApplied: response.data.maxDiscountApplied
-          });
-        }
-        
-        const discountMessage = response.data.maxDiscountApplied 
-          ? `✅ Coupon applied! Max discount of ₹${response.data.maxDiscount} applied (${response.data.effectiveDiscountPercent || response.data.discountPercent}%)`
-          : `✅ Coupon applied! You saved ₹${discountAmount} (${response.data.discountPercent}%)`;
-        
-        setCouponSuccess(discountMessage);
+        setCouponSuccess(`✅ Coupon applied! You saved ₹${discountAmount}`);
         setCouponError('');
+        // ✅ Recalculate totals with new discount
         calculateTotals(cart);
       } else {
         setCouponError(response.data.message || 'Invalid coupon');
@@ -262,21 +238,14 @@ function CheckoutPage() {
     }
   };
 
+  // ✅ Remove Coupon
   const removeCoupon = () => {
     setCouponDiscount(0);
     setCouponCode('');
     setCouponSuccess('');
     setCouponError('');
-    setMaxDiscountInfo(null);
     setAppliedCoupon(null);
     calculateTotals(cart);
-  };
-
-  const quickApplyCoupon = (coupon) => {
-    setCouponCode(coupon.code);
-    setShowAvailableCoupons(false);
-    // Auto apply after a brief delay
-    setTimeout(() => applyCoupon(), 300);
   };
 
   const createOrder = async () => {
@@ -404,14 +373,12 @@ function CheckoutPage() {
         },
         modal: {
           ondismiss: function() {
-            // Cancel the order when user closes Razorpay
             axios.post(`${API_URL}/api/orders/cancel-pending/${order.orderId}`, {}, {
               headers: { Authorization: `Bearer ${token}` }
             }).catch(() => {});
             
             setProcessing(false);
             setPaymentStatus('pending');
-            alert('Payment was not completed. Please try again when you are ready.');
           }
         }
       };
@@ -445,9 +412,7 @@ function CheckoutPage() {
       if (response.data.success) {
         setPaymentStatus('confirmed');
         setProcessing(false);
-        
         await clearCartAfterOrder();
-        
         navigate('/order-confirmation', { 
           state: { order: response.data.order }
         });
@@ -696,354 +661,177 @@ function CheckoutPage() {
             </div>
           </div>
 
-          {/* Right Column - Order Summary & Payment */}
+          {/* Right Column - Order Summary */}
           <div className="checkout-right">
-            {/* Order Summary */}
             <div className="checkout-section summary-section">
               <div className="section-header">
                 <h3>💰 Order Summary</h3>
               </div>
-              
-              {/* Free Shipping Progress */}
-              {subtotal > 0 && subtotal < 999 && (
-                <div className="free-shipping-progress">
-                  <div className="free-shipping-info">
-                    <span className="free-shipping-icon">🚚</span>
-                    <span className="free-shipping-text">
-                      Add <strong>₹{999 - subtotal}</strong> more for FREE Shipping!
-                    </span>
-                  </div>
-                  <div className="free-shipping-bar">
-                    <div 
-                      className="free-shipping-bar-fill" 
-                      style={{ width: `${Math.min((subtotal / 999) * 100, 100)}%` }}
-                    />
-                  </div>
-                  <div className="free-shipping-status">
-                    <span>Progress</span>
-                    <span className="progress-amount">₹{subtotal} / ₹999</span>
-                  </div>
-                </div>
-              )}
-
-              {subtotal >= 999 && (
-                <div className="free-shipping-applied">
-                  <span>✅</span>
-                  <span>Free Shipping Applied! 🎉</span>
-                </div>
-              )}
 
               <div className="summary-breakdown">
                 <div className="summary-row">
-                  <span>Item Total ({cart.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
+                  <span>Item Total</span>
                   <span>₹{subtotal}</span>
                 </div>
                 
                 <div className="summary-row">
-                  <span>🚚 Shipping Fee</span>
+                  <span>🚚 Shipping</span>
                   {shippingFee === 0 ? (
-                    <span className="free-badge shipping">FREE</span>
+                    <span style={{ color: '#28a745', fontWeight: 'bold' }}>FREE</span>
                   ) : (
                     <span>₹{shippingFee}</span>
                   )}
                 </div>
-                
-                <div className="summary-row">
-                  <span>✨ Platform Fee</span>
-                  <span className="free-badge platform">FREE</span>
-                </div>
-                
-                <div className="summary-row">
-                  <span>💫 Handling Fee</span>
-                  <span className="free-badge handling">FREE</span>
-                </div>
-                
-                {/* ✅ Show coupon discount with visual */}
+
+                {/* ✅ Coupon Discount Row - Shows when applied */}
                 {couponDiscount > 0 && (
-                  <div className="summary-row discount" style={{ 
-                    background: 'rgba(40, 167, 69, 0.08)',
-                    padding: '6px 0',
-                    borderRadius: '4px',
-                    margin: '2px 0'
-                  }}>
-                    <span>
-                      🎟️ Coupon Discount
-                      {appliedCoupon && (
-                        <span style={{ fontSize: '12px', color: '#888', marginLeft: '4px' }}>
-                          ({appliedCoupon.code})
-                        </span>
-                      )}
-                      {maxDiscountInfo?.maxApplied && (
-                        <span style={{ fontSize: '11px', color: '#ff8800', marginLeft: '4px' }}>
-                          (Max ₹{maxDiscountInfo.maxDiscount})
-                        </span>
-                      )}
-                    </span>
-                    <span style={{ color: '#28a745', fontWeight: 'bold' }}>-₹{couponDiscount}</span>
+                  <div className="summary-row" style={{ color: '#28a745' }}>
+                    <span>🎟️ Coupon ({appliedCoupon?.code || 'Applied'})</span>
+                    <span>-₹{couponDiscount}</span>
                   </div>
                 )}
-                
+
                 <div className="summary-divider"></div>
+                
                 <div className="summary-row total" style={{ fontSize: '20px' }}>
-                  <span><strong>💰 Total Amount</strong></span>
-                  <span style={{ color: '#D4AF37' }}><strong>₹{finalTotal}</strong></span>
+                  <span><strong>Total</strong></span>
+                  <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>
+                    ₹{finalTotal}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* ✅ Coupon Section - Beautiful UI */}
-            <div className="checkout-section coupon-section" style={{ 
-              border: couponDiscount > 0 ? '2px solid #28a745' : '1px solid #333',
-              transition: 'all 0.3s ease'
-            }}>
-              <div className="section-header">
-                <h3>🎟️ Apply Coupon</h3>
-                {couponDiscount > 0 && (
-                  <span style={{ color: '#28a745', fontWeight: 'bold' }}>
-                    ✅ Applied
-                  </span>
-                )}
-              </div>
-              
-              <div className="coupon-input-group">
+            {/* ✅ SIMPLIFIED COUPON SECTION - Like Myntra */}
+            <div className="checkout-section coupon-section">
+              <div className="coupon-input-group" style={{ display: 'flex', gap: '10px' }}>
                 <input
                   type="text"
-                  placeholder="Enter coupon code"
+                  placeholder="Apply Coupon"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   disabled={couponDiscount > 0}
-                  style={{ 
-                    opacity: couponDiscount > 0 ? 0.6 : 1,
-                    borderColor: couponDiscount > 0 ? '#28a745' : undefined
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: '#222',
+                    border: couponDiscount > 0 ? '1px solid #28a745' : '1px solid #333',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    outline: 'none',
+                    opacity: couponDiscount > 0 ? 0.6 : 1
                   }}
                 />
                 {couponDiscount > 0 ? (
-                  <button 
+                  <button
                     onClick={removeCoupon}
-                    style={{ 
+                    style={{
+                      padding: '12px 20px',
                       background: '#ff4444',
                       border: 'none',
-                      padding: '10px 20px',
-                      borderRadius: '6px',
-                      color: 'white',
+                      borderRadius: '8px',
+                      color: '#fff',
                       fontWeight: 'bold',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
                     }}
                   >
-                    ✕ Remove
+                    Remove
                   </button>
                 ) : (
-                  <button 
+                  <button
                     onClick={applyCoupon}
-                    style={{ 
+                    style={{
+                      padding: '12px 20px',
                       background: '#D4AF37',
                       border: 'none',
-                      padding: '10px 20px',
-                      borderRadius: '6px',
+                      borderRadius: '8px',
                       color: '#000',
                       fontWeight: 'bold',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     Apply
                   </button>
                 )}
               </div>
-              
-              {/* ✅ Coupon Applied Success Message */}
+
               {couponSuccess && (
-                <div style={{
-                  marginTop: '10px',
-                  padding: '12px 16px',
-                  background: 'rgba(40, 167, 69, 0.1)',
-                  border: '1px solid rgba(40, 167, 69, 0.2)',
-                  borderRadius: '8px',
+                <div style={{ 
+                  marginTop: '10px', 
+                  color: '#28a745',
+                  fontSize: '13px',
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '8px'
+                  gap: '6px'
                 }}>
-                  <div>
-                    <span style={{ color: '#28a745' }}>✅</span>
-                    <span style={{ color: '#ccc', marginLeft: '8px' }}>{couponSuccess}</span>
-                  </div>
-                  {maxDiscountInfo && (
-                    <div style={{ fontSize: '12px', color: '#888' }}>
-                      {maxDiscountInfo.maxApplied ? (
-                        <span style={{ color: '#ff8800' }}>
-                          Max discount ₹{maxDiscountInfo.maxDiscount} applied 
-                          ({maxDiscountInfo.effectiveDiscountPercent || maxDiscountInfo.discountPercent}%)
-                        </span>
-                      ) : (
-                        <span style={{ color: '#28a745' }}>
-                          {maxDiscountInfo.discountPercent}% off • Max ₹{maxDiscountInfo.maxDiscount}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <span>✅</span> {couponSuccess}
                 </div>
               )}
-              
-              {/* ✅ Coupon Error */}
+
               {couponError && (
-                <div style={{
-                  marginTop: '10px',
-                  padding: '10px 14px',
-                  background: 'rgba(255, 68, 68, 0.1)',
-                  border: '1px solid rgba(255, 68, 68, 0.2)',
-                  borderRadius: '8px',
+                <div style={{ 
+                  marginTop: '10px', 
                   color: '#ff4444',
-                  fontSize: '13px'
+                  fontSize: '13px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}>
-                  {couponError}
-                </div>
-              )}
-
-              {/* ✅ Available Coupons Section */}
-              {availableCoupons.length > 0 && !couponDiscount && (
-                <div style={{ marginTop: '16px' }}>
-                  <button
-                    onClick={() => setShowAvailableCoupons(!showAvailableCoupons)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#D4AF37',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      padding: '4px 0',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    {showAvailableCoupons ? '▲ Hide available coupons' : '▼ Show available coupons'}
-                    <span style={{ fontSize: '11px', color: '#666' }}>
-                      ({availableCoupons.length} available)
-                    </span>
-                  </button>
-
-                  {showAvailableCoupons && (
-                    <div style={{ 
-                      marginTop: '10px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '8px',
-                      maxHeight: '200px',
-                      overflowY: 'auto'
-                    }}>
-                      {availableCoupons.map((coupon) => (
-                        <div
-                          key={coupon._id}
-                          onClick={() => quickApplyCoupon(coupon)}
-                          style={{
-                            padding: '12px 16px',
-                            background: '#1a1a1a',
-                            border: '1px solid #333',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                            gap: '8px'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#D4AF37';
-                            e.currentTarget.style.background = '#222';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = '#333';
-                            e.currentTarget.style.background = '#1a1a1a';
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 'bold', color: '#D4AF37' }}>
-                              {coupon.code}
-                            </div>
-                            <div style={{ fontSize: '12px', color: '#888' }}>
-                              {coupon.name || coupon.description}
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ color: '#28a745', fontWeight: 'bold' }}>
-                              {coupon.discountType === 'percentage' 
-                                ? `${coupon.discountValue}% OFF`
-                                : `₹${coupon.discountValue} OFF`
-                              }
-                            </div>
-                            {coupon.maxDiscount > 0 && (
-                              <div style={{ fontSize: '11px', color: '#888' }}>
-                                Max ₹{coupon.maxDiscount}
-                              </div>
-                            )}
-                            {coupon.minOrderValue > 0 && (
-                              <div style={{ fontSize: '11px', color: '#666' }}>
-                                Min ₹{coupon.minOrderValue}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <span>❌</span> {couponError}
                 </div>
               )}
             </div>
 
-            {/* Payment - Razorpay Only */}
+            {/* Payment */}
             <div className="checkout-section payment-section">
-              <div className="section-header">
-                <h3>💳 Payment</h3>
-              </div>
-              
-              <div className="payment-buttons">
-                <button
-                  className="pay-btn razorpay-btn"
-                  onClick={initiateRazorpayPayment}
-                  disabled={!selectedAddress || processing}
-                  style={{ width: '100%' }}
-                >
-                  {processing ? '⏳ Processing...' : '💳 Pay with Razorpay'}
-                </button>
-              </div>
+              <button
+                className="pay-btn razorpay-btn"
+                onClick={initiateRazorpayPayment}
+                disabled={!selectedAddress || processing}
+                style={{ 
+                  width: '100%',
+                  padding: '14px',
+                  background: 'linear-gradient(135deg, #D4AF37, #FFB7C5)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  opacity: (!selectedAddress || processing) ? 0.6 : 1
+                }}
+              >
+                {processing ? '⏳ Processing...' : `Pay ₹${finalTotal}`}
+              </button>
 
               {processing && (
-                <div className="processing-indicator">
-                  <div className="kawaii-spinner-small"></div>
-                  <p>Processing your payment...</p>
-                </div>
-              )}
-
-              {paymentStatus === 'verifying' && (
-                <div className="verification-status">
-                  <div className="kawaii-spinner-small"></div>
-                  <p>⏳ Waiting for payment confirmation...</p>
-                  <p className="verification-hint">Please complete the payment in the Razorpay window</p>
-                  <p className="verification-attempts">Attempt {pollAttempts}/30</p>
-                </div>
-              )}
-
-              {paymentStatus === 'failed' && (
-                <div className="payment-failed">
-                  <p>❌ Payment Failed</p>
-                  <p className="failed-hint">Please try again or use a different payment method.</p>
-                  {orderId && (
-                    <p className="order-id-display">📋 Order ID: {orderId}</p>
-                  )}
-                  <button 
-                    className="retry-btn"
-                    onClick={() => { setPaymentStatus('pending'); setProcessing(false); setPollAttempts(0); }}
-                  >
-                    🔄 Try Again
-                  </button>
+                <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                  <div style={{ 
+                    width: '30px', 
+                    height: '30px', 
+                    border: '3px solid #333',
+                    borderTop: '3px solid #D4AF37',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    margin: '0 auto 8px'
+                  }}></div>
+                  <p style={{ color: '#888', fontSize: '13px' }}>Processing your payment...</p>
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
