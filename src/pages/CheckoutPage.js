@@ -64,9 +64,15 @@ function CheckoutPage() {
   useEffect(() => {
     const savedCart = localStorage.getItem('loop_cart');
     if (savedCart) {
-      const parsedCart = JSON.parse(savedCart);
-      setCart(parsedCart);
-      calculateTotals(parsedCart);
+      try {
+        const parsedCart = JSON.parse(savedCart);
+        console.log('🛒 Cart loaded:', parsedCart);
+        setCart(parsedCart);
+        calculateTotals(parsedCart);
+      } catch (e) {
+        console.error('Error parsing cart:', e);
+        setCart([]);
+      }
     }
     
     const token = localStorage.getItem('loop_token');
@@ -109,9 +115,35 @@ function CheckoutPage() {
     }
   };
 
-  // ✅ Calculate totals with coupon
+  // ✅ FIXED: Calculate totals with proper price handling
   const calculateTotals = (cartItems) => {
-    const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    // Make sure cartItems is an array
+    const items = cartItems || [];
+    
+    console.log('📦 Calculating totals for:', items.length, 'items');
+    
+    // Calculate subtotal with proper price fallback
+    const subtotal = items.reduce((sum, item) => {
+      // Try multiple price field names
+      const price = item.price || 
+                    item.salePrice || 
+                    item.productPrice || 
+                    item.displayPrice || 
+                    item.originalPrice ||
+                    item.amount ||
+                    item.product?.price ||
+                    item.product?.salePrice ||
+                    0;
+      
+      const quantity = item.quantity || item.qty || 1;
+      const itemTotal = price * quantity;
+      
+      console.log(`📦 ${item.name || 'Item'}: ₹${price} × ${quantity} = ₹${itemTotal}`);
+      
+      return sum + itemTotal;
+    }, 0);
+    
+    console.log('💰 Subtotal calculated:', subtotal);
     setSubtotal(subtotal);
     
     const shipping = subtotal > 999 ? 0 : 60;
@@ -124,12 +156,15 @@ function CheckoutPage() {
     setHandlingFee(handling);
     
     const total = subtotal + shipping + platform + handling - couponDiscount;
+    console.log('💰 Final total:', total);
     setFinalTotal(total);
   };
 
   // ✅ Recalculate when coupon changes
   useEffect(() => {
-    calculateTotals(cart);
+    if (cart.length > 0) {
+      calculateTotals(cart);
+    }
   }, [couponDiscount]);
 
   const fetchActivePayment = async () => {
@@ -231,29 +266,37 @@ function CheckoutPage() {
       const token = localStorage.getItem('loop_token');
       const userId = user?.id || null;
 
+      console.log('🎟️ Applying coupon:', couponCode, 'Subtotal:', subtotal);
+
       const response = await axios.post(`${API_URL}/api/coupons/validate`, {
         code: couponCode.toUpperCase(),
         userId,
         cartTotal: subtotal
       });
 
+      console.log('🎟️ Coupon response:', response.data);
+
       if (response.data.valid) {
         const discountAmount = response.data.discountAmount || 0;
+        console.log('🎟️ Discount amount:', discountAmount);
         setCouponDiscount(discountAmount);
         setAppliedCoupon(response.data);
         setCouponSuccess(`✅ You saved ₹${discountAmount}`);
         setCouponError('');
+        // Recalculate with new discount
         calculateTotals(cart);
       } else {
         setCouponError(response.data.message || 'Invalid coupon');
       }
     } catch (error) {
+      console.error('Coupon error:', error);
       setCouponError(error.response?.data?.message || 'Failed to apply coupon');
     }
   };
 
   // ✅ Remove Coupon
   const removeCoupon = () => {
+    console.log('🎟️ Removing coupon');
     setCouponDiscount(0);
     setCouponCode('');
     setCouponSuccess('');
@@ -264,6 +307,7 @@ function CheckoutPage() {
 
   // ✅ Quick apply available coupon
   const quickApplyCoupon = (coupon) => {
+    console.log('🎟️ Quick apply:', coupon.code);
     setCouponCode(coupon.code);
     setShowAvailableCoupons(false);
     setTimeout(() => applyCoupon(), 300);
@@ -280,10 +324,10 @@ function CheckoutPage() {
       }
       
       const orderItems = cart.map(item => ({
-        productId: item._id || item.id,
+        productId: item._id || item.id || item.productId,
         name: item.name,
-        price: item.price,
-        quantity: item.quantity,
+        price: item.price || item.salePrice || item.productPrice || 0,
+        quantity: item.quantity || 1,
         size: item.size || 'M',
         color: item.color || 'Black'
       }));
@@ -312,6 +356,8 @@ function CheckoutPage() {
         total: finalTotal,
         paymentMethod: 'razorpay'
       };
+
+      console.log('📦 Creating order:', orderData);
 
       const response = await axios.post(`${API_URL}/api/orders`, orderData, {
         headers: { 
@@ -657,27 +703,31 @@ function CheckoutPage() {
             <div className="checkout-section">
               <div className="section-header">
                 <h3>🛒 Items in Cart</h3>
-                <span className="item-count">{cart.reduce((sum, item) => sum + item.quantity, 0)} items</span>
+                <span className="item-count">{cart.reduce((sum, item) => sum + (item.quantity || 1), 0)} items</span>
               </div>
               <div className="cart-items-review">
-                {cart.map((item, index) => (
-                  <div key={index} className="cart-item-review">
-                    <div className="item-review-image">
-                      {item.image ? (
-                        <img src={item.image} alt={item.name} />
-                      ) : (
-                        <span>🎀</span>
-                      )}
+                {cart.map((item, index) => {
+                  const price = item.price || item.salePrice || item.productPrice || 0;
+                  const quantity = item.quantity || 1;
+                  return (
+                    <div key={index} className="cart-item-review">
+                      <div className="item-review-image">
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} />
+                        ) : (
+                          <span>🎀</span>
+                        )}
+                      </div>
+                      <div className="item-review-info">
+                        <span className="item-review-name">{item.name || 'Product'}</span>
+                        <span className="item-review-detail">Qty: {quantity} × ₹{price}</span>
+                      </div>
+                      <div className="item-review-total">
+                        ₹{price * quantity}
+                      </div>
                     </div>
-                    <div className="item-review-info">
-                      <span className="item-review-name">{item.name}</span>
-                      <span className="item-review-detail">Qty: {item.quantity} × ₹{item.price}</span>
-                    </div>
-                    <div className="item-review-total">
-                      ₹{item.price * item.quantity}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -886,7 +936,7 @@ function CheckoutPage() {
 
               <div className="summary-breakdown">
                 <div className="summary-row">
-                  <span>Item Total ({cart.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
+                  <span>Item Total ({cart.reduce((sum, item) => sum + (item.quantity || 1), 0)} items)</span>
                   <span>₹{subtotal}</span>
                 </div>
                 
