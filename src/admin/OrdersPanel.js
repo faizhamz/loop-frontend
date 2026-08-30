@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { motion, AnimatePresence } from 'framer-motion';
+import ShippingLabelModal from '../components/ShippingLabelModal';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
@@ -18,6 +20,13 @@ function OrdersPanel() {
   const [expandedModalSections, setExpandedModalSections] = useState([]);
   const [cleanupStats, setCleanupStats] = useState(null);
   const [cleaning, setCleaning] = useState(false);
+
+  // ============================================
+  // ✅ NEW: Shipping Label Modal State
+  // ============================================
+  const [showLabelModal, setShowLabelModal] = useState(false);
+  const [selectedOrderForLabel, setSelectedOrderForLabel] = useState(null);
+  const [labelGenerating, setLabelGenerating] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -69,6 +78,23 @@ function OrdersPanel() {
     } finally {
       setCleaning(false);
     }
+  };
+
+  // ============================================
+  // ✅ NEW: Open Shipping Label Modal
+  // ============================================
+  const openLabelModal = (order) => {
+    setSelectedOrderForLabel(order);
+    setShowLabelModal(true);
+  };
+
+  // ============================================
+  // ✅ NEW: Handle Label Generated
+  // ============================================
+  const handleLabelGenerated = (labelData) => {
+    console.log('✅ Label generated:', labelData);
+    // Refresh orders to update tracking info
+    fetchOrders();
   };
 
   // ============================================
@@ -551,6 +577,7 @@ function OrdersPanel() {
                     </td>
                     <td>
                       <div className="action-buttons">
+                        {/* ✅ View Details Button */}
                         <button
                           onClick={() => viewOrderDetails(order)}
                           className="action-btn view-btn"
@@ -558,6 +585,8 @@ function OrdersPanel() {
                         >
                           📋
                         </button>
+                        
+                        {/* ✅ Invoice Button */}
                         <button
                           onClick={() => downloadInvoice(order._id)}
                           className="action-btn invoice-btn"
@@ -565,15 +594,44 @@ function OrdersPanel() {
                         >
                           📄
                         </button>
+                        
+                        {/* ✅ Shipping Label Button - NEW */}
+                        <button
+                          onClick={() => openLabelModal(order)}
+                          className="action-btn label-btn"
+                          title="Generate Shipping Label"
+                          style={{
+                            background: 'rgba(212, 175, 55, 0.15)',
+                            color: '#D4AF37',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '14px',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.25)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
+                          }}
+                        >
+                          📦
+                        </button>
+                        
+                        {/* ✅ Tracking Button */}
                         {order.status !== 'delivered' && order.status !== 'cancelled' && (
                           <button
                             onClick={() => handleAddTracking(order._id)}
                             className="action-btn track-btn"
                             title="Add Tracking"
                           >
-                            📦
+                            🔗
                           </button>
                         )}
+                        
+                        {/* ✅ Delete Button */}
                         <button
                           onClick={() => deleteOrder(order._id)}
                           className="action-btn delete-btn"
@@ -582,6 +640,8 @@ function OrdersPanel() {
                           🗑️
                         </button>
                       </div>
+                      
+                      {/* Status Dropdown */}
                       <select
                         onChange={(e) => updateStatus(order._id, e.target.value)}
                         value={order.status || 'pending'}
@@ -986,6 +1046,19 @@ function OrdersPanel() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ✅ Shipping Label Modal - NEW */}
+      {showLabelModal && selectedOrderForLabel && (
+        <ShippingLabelModal
+          isOpen={showLabelModal}
+          onClose={() => {
+            setShowLabelModal(false);
+            setSelectedOrderForLabel(null);
+          }}
+          order={selectedOrderForLabel}
+          onLabelGenerated={handleLabelGenerated}
+        />
       )}
     </div>
   );
