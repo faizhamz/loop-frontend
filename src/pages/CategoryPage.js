@@ -25,7 +25,7 @@ const staggerContainer = {
   }
 };
 
-// ✅ Helper: Check if product has size variants
+// Helper: Check if product has size variants
 const hasSizeVariant = (product) => {
   if (!product.variants || product.variants.length === 0) return false;
   return product.variants.some(v => 
@@ -33,7 +33,7 @@ const hasSizeVariant = (product) => {
   );
 };
 
-// ✅ Helper: Get available sizes for a product
+// Helper: Get available sizes for a product
 const getProductSizes = (product) => {
   const sizeVariant = product.variants?.find(v => 
     v.type === 'Size' || v.name === 'Size' || v.type?.toLowerCase() === 'size'
@@ -59,19 +59,19 @@ function CategoryPage({
   const [sortBy, setSortBy] = useState('relevance');
   const [filteredProducts, setFilteredProducts] = useState([]);
   
-  // ✅ Price Range Filter
+  // Price Range Filter
   const [priceRange, setPriceRange] = useState({ min: 0, max: 10000 });
   const [tempPriceRange, setTempPriceRange] = useState({ min: 0, max: 10000 });
   const [showPriceFilter, setShowPriceFilter] = useState(false);
   
-  // ✅ Rating Filter
+  // Rating Filter
   const [minRating, setMinRating] = useState(0);
   
-  // ✅ Size Filter
+  // Size Filter
   const [selectedSizes, setSelectedSizes] = useState([]);
   const availableSizes = ['S', 'M', 'L', 'XL', 'XXL'];
 
-  // ✅ Check if ANY product in this category has sizes
+  // Check if ANY product in this category has sizes
   const hasAnySizeProducts = useMemo(() => {
     return products.some(p => getProductSizes(p).length > 0);
   }, [products]);
@@ -106,18 +106,18 @@ function CategoryPage({
   const sortProducts = () => {
     let sorted = [...(products || [])];
     
-    // ✅ Apply Price Filter
+    // Apply Price Filter
     sorted = sorted.filter(product => {
       const price = product.salePrice || product.price || 0;
       return price >= priceRange.min && price <= priceRange.max;
     });
     
-    // ✅ Apply Rating Filter
+    // Apply Rating Filter
     if (minRating > 0) {
       sorted = sorted.filter(product => (product.avgRating || 0) >= minRating);
     }
     
-    // ✅ Apply Size Filter - SMART handling
+    // Apply Size Filter - SMART handling
     if (selectedSizes.length > 0) {
       sorted = sorted.filter(product => {
         const productSizes = getProductSizes(product);
@@ -132,7 +132,7 @@ function CategoryPage({
       });
     }
     
-    // ✅ Apply Sort
+    // Apply Sort
     switch (sortBy) {
       case 'price-low':
         sorted.sort((a, b) => (a.salePrice || a.price || 0) - (b.salePrice || b.price || 0));
@@ -161,6 +161,14 @@ function CategoryPage({
   const handleAddToCart = (product, e) => {
     if (e) e.stopPropagation();
     if (!product) return;
+    
+    // ✅ Check stock
+    const availableStock = product.stock || 0;
+    if (availableStock === 0) {
+      alert('⚠️ This product is out of stock!');
+      return;
+    }
+    
     addToCart(product);
   };
 
@@ -184,7 +192,6 @@ function CategoryPage({
     window.location.href = `/product/${slug}`;
   };
 
-  // ✅ Toggle size selection
   const toggleSize = (size) => {
     if (selectedSizes.includes(size)) {
       setSelectedSizes(selectedSizes.filter(s => s !== size));
@@ -193,13 +200,11 @@ function CategoryPage({
     }
   };
 
-  // ✅ Apply price filter
   const applyPriceFilter = () => {
     setPriceRange(tempPriceRange);
     setShowPriceFilter(false);
   };
 
-  // ✅ Reset all filters
   const resetFilters = () => {
     setPriceRange({ min: 0, max: tempPriceRange.max });
     setTempPriceRange({ min: 0, max: tempPriceRange.max });
@@ -239,7 +244,6 @@ function CategoryPage({
 
   return (
     <div className="category-page">
-      {/* ✅ META TAGS */}
       <Helmet>
         <title>{category.name} | LOOP - Premium Fashion</title>
         <meta name="description" content={`Explore ${category.name} collection at LOOP. ${category.description || `Shop the best ${category.name} products online.`} Free delivery on orders above ₹999.`} />
@@ -320,7 +324,6 @@ function CategoryPage({
           </div>
           
           <div className="category-filter-controls">
-            {/* ✅ Price Filter Button */}
             <button 
               className={`filter-toggle-btn ${showPriceFilter ? 'active' : ''}`}
               onClick={() => setShowPriceFilter(!showPriceFilter)}
@@ -328,7 +331,6 @@ function CategoryPage({
               💰 Price {priceRange.min > 0 || priceRange.max < tempPriceRange.max ? '●' : ''}
             </button>
             
-            {/* ✅ Rating Filter Buttons */}
             <div className="rating-filter-buttons">
               <button 
                 className={`rating-filter-btn ${minRating === 0 ? 'active' : ''}`}
@@ -347,7 +349,6 @@ function CategoryPage({
               ))}
             </div>
             
-            {/* ✅ Size Filter - ONLY SHOW IF PRODUCTS HAVE SIZES */}
             {hasAnySizeProducts && (
               <div className="size-filter-buttons">
                 {availableSizes.map(size => (
@@ -362,7 +363,6 @@ function CategoryPage({
               </div>
             )}
             
-            {/* ✅ Reset Filters */}
             {hasActiveFilters && (
               <button className="reset-filters-btn" onClick={resetFilters}>
                 ✕ Clear Filters
@@ -375,7 +375,7 @@ function CategoryPage({
           </span>
         </motion.div>
 
-        {/* ✅ Price Range Filter Panel */}
+        {/* Price Range Filter Panel */}
         {showPriceFilter && (
           <motion.div 
             className="price-filter-panel"
@@ -445,8 +445,9 @@ function CategoryPage({
               const productSlug = product.productId || (product.name ? product.name.toLowerCase().replace(/ /g, '-') : 'product');
               const inWishlist = isInWishlist(product._id);
               const quantity = getCartQuantity(product._id);
+              const availableStock = product.stock || 0;
+              const isOutOfStock = availableStock === 0;
               
-              // ✅ Get product sizes for display
               const productSizes = getProductSizes(product);
               const hasSizes = productSizes.length > 0;
 
@@ -471,6 +472,36 @@ function CategoryPage({
                     {product.avgRating >= 4 && (
                       <span className="top-rated-badge">⭐ Top Rated</span>
                     )}
+                    {isOutOfStock && (
+                      <span className="out-of-stock-badge" style={{
+                        position: 'absolute',
+                        bottom: '10px',
+                        left: '10px',
+                        background: 'rgba(255, 68, 68, 0.9)',
+                        color: '#fff',
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}>
+                        Out of Stock
+                      </span>
+                    )}
+                    {!isOutOfStock && availableStock <= 10 && (
+                      <span className="low-stock-badge" style={{
+                        position: 'absolute',
+                        bottom: '10px',
+                        left: '10px',
+                        background: 'rgba(255, 136, 0, 0.9)',
+                        color: '#fff',
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}>
+                        ⚡ Only {availableStock} left
+                      </span>
+                    )}
                     <button 
                       className={`wishlist-btn ${inWishlist ? 'active' : ''}`}
                       onClick={(e) => {
@@ -485,7 +516,6 @@ function CategoryPage({
                   <div className="product-info">
                     <h3 className="product-name">{product.name || 'Unnamed Product'}</h3>
                     
-                    {/* ✅ Show size info - only if product has sizes */}
                     {hasSizes && (
                       <div className="product-sizes-display">
                         <span className="sizes-label">Sizes:</span>
@@ -527,16 +557,39 @@ function CategoryPage({
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            updateQuantity(product._id, quantity + 1);
+                            if (quantity < availableStock) {
+                              updateQuantity(product._id, quantity + 1);
+                            } else {
+                              alert(`⚠️ Only ${availableStock} items available in stock!`);
+                            }
+                          }}
+                          disabled={quantity >= availableStock}
+                          style={{
+                            opacity: quantity >= availableStock ? 0.4 : 1,
+                            cursor: quantity >= availableStock ? 'not-allowed' : 'pointer'
                           }}
                         >+</button>
                       </div>
                     ) : (
                       <button 
                         className="add-to-cart"
-                        onClick={(e) => handleAddToCart(product, e)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isOutOfStock) {
+                            alert('⚠️ This product is out of stock!');
+                            return;
+                          }
+                          handleAddToCart(product, e);
+                        }}
+                        style={{
+                          background: isOutOfStock ? '#555' : '#D4AF37',
+                          color: isOutOfStock ? '#888' : '#000',
+                          cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                          opacity: isOutOfStock ? 0.6 : 1
+                        }}
+                        disabled={isOutOfStock}
                       >
-                        🛒 Add
+                        {isOutOfStock ? 'Out of Stock' : '🛒 Add'}
                       </button>
                     )}
                   </div>

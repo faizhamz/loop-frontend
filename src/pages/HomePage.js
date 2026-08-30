@@ -96,6 +96,14 @@ function HomePage({
   const handleAddToCart = (product, e) => {
     if (e) e.stopPropagation();
     if (!product) return;
+    
+    // ✅ Check stock before adding
+    const availableStock = product.stock || 0;
+    if (availableStock === 0) {
+      alert('⚠️ This product is out of stock!');
+      return;
+    }
+    
     addToCart(product);
     setCartAnimationLocal(true);
     setTimeout(() => {
@@ -308,7 +316,7 @@ function HomePage({
       <section className="category-section">
         <div className="container">
           <div className="category-section-header">
-            <h2 className="category-section-title">🛍️ Shop By Category</h2>
+            <h2 className="category-section-title"> Explore By Category</h2>
             {(categories || []).length > 0 && (
               <span className="category-section-count">{(categories || []).length} Categories</span>
             )}
@@ -374,6 +382,8 @@ function HomePage({
                 const inWishlist = isInWishlist(product._id);
                 const cartItem = cart.find(item => item.id === product._id);
                 const quantity = cartItem?.quantity || 0;
+                const availableStock = product.stock || 0;
+                const isOutOfStock = availableStock === 0;
 
                 return (
                   <motion.div 
@@ -402,6 +412,36 @@ function HomePage({
                       )}
                       {product.avgRating >= 4 && (
                         <span className="top-rated-badge">⭐ Top Rated</span>
+                      )}
+                      {isOutOfStock && (
+                        <span className="out-of-stock-badge" style={{
+                          position: 'absolute',
+                          bottom: '10px',
+                          left: '10px',
+                          background: 'rgba(255, 68, 68, 0.9)',
+                          color: '#fff',
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          Out of Stock
+                        </span>
+                      )}
+                      {!isOutOfStock && availableStock <= 10 && (
+                        <span className="low-stock-badge" style={{
+                          position: 'absolute',
+                          bottom: '10px',
+                          left: '10px',
+                          background: 'rgba(255, 136, 0, 0.9)',
+                          color: '#fff',
+                          padding: '4px 12px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}>
+                          ⚡ Only {availableStock} left
+                        </span>
                       )}
                       <motion.button 
                         className={`wishlist-btn-card ${inWishlist ? 'active' : ''}`}
@@ -444,20 +484,36 @@ function HomePage({
                             className="qty-btn"
                             onClick={(e) => {
                               e.stopPropagation();
-                              updateQuantity(product._id, quantity + 1);
+                              if (quantity < availableStock) {
+                                updateQuantity(product._id, quantity + 1);
+                              } else {
+                                alert(`⚠️ Only ${availableStock} items available in stock!`);
+                              }
                             }}
-                          >+</button>
+                            disabled={quantity >= availableStock}
+                            style={{
+                              opacity: quantity >= availableStock ? 0.4 : 1,
+                              cursor: quantity >= availableStock ? 'not-allowed' : 'pointer'
+                            }}
+                          >+</motion.button>
                         </div>
                       ) : (
                         <motion.button 
                           className="add-to-cart" 
                           onClick={(e) => handleAddToCart(product, e)}
-                          whileHover={{ scale: 1.02, backgroundColor: '#c49f2e' }}
+                          whileHover={{ scale: 1.02, backgroundColor: isOutOfStock ? '#555' : '#c49f2e' }}
                           whileTap={{ scale: 0.95 }}
+                          style={{
+                            background: isOutOfStock ? '#555' : '#D4AF37',
+                            color: isOutOfStock ? '#888' : '#000',
+                            cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                            opacity: isOutOfStock ? 0.6 : 1
+                          }}
+                          disabled={isOutOfStock}
                         >
                           <span className="btn-content">
                             <span className="btn-icon">🛒</span>
-                            Add to Cart
+                            {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
                           </span>
                         </motion.button>
                       )}

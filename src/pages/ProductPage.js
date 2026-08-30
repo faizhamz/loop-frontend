@@ -8,6 +8,7 @@ import RatingStars from '../components/RatingStars';
 import ReviewModal from '../components/ReviewModal';
 import StockWarning, { VariantStockWarning } from '../components/StockWarning';
 import WhatsAppIcon from '../components/WhatsAppIcon';
+import FAQSection from '../components/FAQSection';
 import './ProductPage.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
@@ -145,9 +146,7 @@ function ProductPage({
 }) {
   const { slug } = useParams();
   const navigate = useNavigate();
-  
-  // ✅ Get theme from context
-  const { isDarkMode } = useApp();
+  const { isDarkMode, user } = useApp();
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -174,8 +173,6 @@ function ProductPage({
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
   const [localWishlist, setLocalWishlist] = useState([]);
-  
-  // ✅ WhatsApp Contact State
   const [whatsappNumber, setWhatsappNumber] = useState('');
   
   // Review states
@@ -193,7 +190,7 @@ function ProductPage({
   const toastTimeoutRef = useRef(null);
   const quantityTimeoutRef = useRef(null);
 
-  // ✅ Theme-based styles
+  // Theme-based styles
   const themeStyles = {
     background: isDarkMode ? '#0a0a0a' : '#f8f4f9',
     color: isDarkMode ? '#ffffff' : '#2d1b2e',
@@ -207,7 +204,7 @@ function ProductPage({
     shadowHover: isDarkMode ? '0 12px 50px rgba(0,0,0,0.4)' : '0 12px 50px rgba(0,0,0,0.12)',
   };
 
-  // ✅ Fetch WhatsApp number
+  // Fetch WhatsApp number
   useEffect(() => {
     const fetchContact = async () => {
       try {
@@ -323,6 +320,7 @@ function ProductPage({
     : variantDetails.price || product?.price || 0;
   
   const isVariantOutOfStock = variantDetails.stock === 0;
+  const availableStock = variantDetails.stock || product?.stock || 0;
 
   // Load wishlist from localStorage
   useEffect(() => {
@@ -543,7 +541,6 @@ function ProductPage({
     };
   }, [showToast]);
 
-  // ✅ Open WhatsApp with product query
   const openWhatsApp = () => {
     if (!whatsappNumber) {
       alert('WhatsApp support number not available. Please contact us via email.');
@@ -574,6 +571,7 @@ function ProductPage({
     }));
   };
 
+  // ✅ Updated: Handle quantity change with stock limit
   const handleQuantityChange = (newQuantity) => {
     if (newQuantity < 1) {
       if (product && isInCart) {
@@ -581,6 +579,12 @@ function ProductPage({
         showToastMessage(`🗑️ Removed from cart`, 'info');
         setQuantity(1);
       }
+      return;
+    }
+    
+    // ✅ Check stock limit
+    if (newQuantity > availableStock) {
+      showToastMessage(`⚠️ Only ${availableStock} items available in stock!`, 'warning');
       return;
     }
     
@@ -612,6 +616,12 @@ function ProductPage({
   const handleAddToCart = () => {
     if (!product) return;
 
+    // ✅ Check stock before adding
+    if (quantity > availableStock) {
+      showToastMessage(`⚠️ Only ${availableStock} items available!`, 'warning');
+      return;
+    }
+
     if (quantityTimeoutRef.current) {
       clearTimeout(quantityTimeoutRef.current);
     }
@@ -638,6 +648,12 @@ function ProductPage({
 
   const handleBuyNow = () => {
     if (!product) return;
+
+    // ✅ Check stock before buying
+    if (quantity > availableStock) {
+      showToastMessage(`⚠️ Only ${availableStock} items available!`, 'warning');
+      return;
+    }
 
     if (isInCart) {
       updateQuantity(product._id, quantity);
@@ -954,7 +970,6 @@ function ProductPage({
         paddingTop: '80px'
       }}
     >
-      {/* ✅ META TAGS + SCHEMA */}
       <Helmet>
         <title>{product.name} | LOOP - Premium Fashion</title>
         <meta name="description" content={`Buy ${product.name} online at LOOP. ₹${product.price}. ${product.description?.slice(0, 150) || 'Premium quality product with free delivery on orders above ₹999.'}`} />
@@ -991,7 +1006,7 @@ function ProductPage({
         {toastMessage}
       </motion.div>
 
-      {/* ✅ WhatsApp Floating Button */}
+      {/* WhatsApp Floating Button */}
       {whatsappNumber && (
         <motion.button
           className="whatsapp-float-btn"
@@ -1397,99 +1412,10 @@ function ProductPage({
               )}
             </div>
 
-            {/* Stock Warning */}
-            <StockWarning stock={variantDetails.stock || product.stock} />
+            {/* ✅ Stock Warning - Updated */}
+            <StockWarning stock={availableStock} />
 
-            {/* Dynamic Variants */}
-            {product.variants && product.variants.length > 0 ? (
-              <div className="dynamic-variant-section" style={{ marginBottom: '16px' }}>
-                {product.variants.map((variant, vIndex) => (
-                  <div key={vIndex} className="dynamic-variant-section" style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', fontWeight: '500', fontSize: '14px', marginBottom: '8px', color: themeStyles.textSecondary }}>
-                      {variant.name || variant.type}:
-                    </label>
-                    <div className="dynamic-variant-options" style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {variant.options.map((option, oIndex) => {
-                        const isSelected = selectedVariant[variant.type || variant.name] === option.value;
-                        const isOutOfStock = (option.stock || 0) === 0;
-                        const priceDiff = option.price || 0;
-                        
-                        return (
-                          <button
-                            key={oIndex}
-                            className={`dynamic-variant-btn ${isSelected ? 'active' : ''} ${isOutOfStock ? 'out-of-stock' : ''}`}
-                            onClick={() => {
-                              if (!isOutOfStock) {
-                                handleVariantSelect(variant.type || variant.name, option.value);
-                              }
-                            }}
-                            disabled={isOutOfStock}
-                            style={{
-                              background: isSelected ? '#D4AF37' : isDarkMode ? '#222' : '#f0e8ed',
-                              border: isSelected ? '1px solid #D4AF37' : isDarkMode ? '1px solid #333' : '1px solid #e8e0e5',
-                              color: isSelected ? '#000' : themeStyles.color,
-                              padding: '10px 20px',
-                              borderRadius: '8px',
-                              cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.3s ease',
-                              fontSize: '14px',
-                              position: 'relative',
-                              opacity: isOutOfStock ? 0.5 : 1
-                            }}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            {option.value}
-                            {priceDiff > 0 && (
-                              <span className="variant-price" style={{ fontSize: '11px', color: themeStyles.textMuted, marginLeft: '4px' }}>
-                                +₹{priceDiff}
-                              </span>
-                            )}
-                            {option.stock !== undefined && option.stock <= 10 && option.stock > 0 && (
-                              <span className="variant-stock-badge" style={{
-                                fontSize: '10px',
-                                background: 'rgba(255,255,255,0.1)',
-                                padding: '1px 8px',
-                                borderRadius: '10px',
-                                marginLeft: '6px'
-                              }}>
-                                ⚡{option.stock}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {selectedVariant[variant.type || variant.name] && (
-                      <div className="variant-stock-info" style={{ fontSize: '13px', color: themeStyles.textMuted, marginTop: '4px' }}>
-                        {variant.options.find(o => o.value === selectedVariant[variant.type || variant.name])?.stock > 0 ? (
-                          variant.options.find(o => o.value === selectedVariant[variant.type || variant.name])?.stock <= 10 ? (
-                            <span className="low-stock" style={{ color: '#ff8800' }}>⚡ Only {variant.options.find(o => o.value === selectedVariant[variant.type || variant.name])?.stock} left!</span>
-                          ) : (
-                            <span className="in-stock" style={{ color: '#28a745' }}>✅ In Stock</span>
-                          )
-                        ) : (
-                          <span className="out-of-stock" style={{ color: '#ff4444' }}>❌ Out of Stock</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="variant-stock-info" style={{ fontSize: '13px', color: themeStyles.textMuted }}>
-                {product.stock > 0 ? (
-                  product.stock <= 10 ? (
-                    <span className="low-stock" style={{ color: '#ff8800' }}>⚡ Only {product.stock} left!</span>
-                  ) : (
-                    <span className="in-stock" style={{ color: '#28a745' }}>✅ In Stock</span>
-                  )
-                ) : (
-                  <span className="out-of-stock" style={{ color: '#ff4444' }}>❌ Out of Stock</span>
-                )}
-              </div>
-            )}
-
+            {/* ✅ Quantity with Stock Limit */}
             <div className="quantity-section" style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
               <label style={{ fontWeight: '500', fontSize: '14px', color: themeStyles.textSecondary }}>Quantity:</label>
               <div className="quantity-control" style={{
@@ -1527,10 +1453,31 @@ function ProductPage({
                     fontSize: '20px',
                     cursor: 'pointer',
                     padding: '5px 10px',
-                    transition: 'all 0.3s ease'
+                    transition: 'all 0.3s ease',
+                    opacity: displayQuantity >= availableStock ? 0.4 : 1,
+                    cursor: displayQuantity >= availableStock ? 'not-allowed' : 'pointer'
                   }}
+                  disabled={displayQuantity >= availableStock}
                 >+</motion.button>
               </div>
+              {availableStock > 0 && availableStock <= 10 && (
+                <span style={{
+                  fontSize: '13px',
+                  color: '#ff8800',
+                  fontWeight: '500'
+                }}>
+                  ⚡ Only {availableStock} left!
+                </span>
+              )}
+              {availableStock === 0 && (
+                <span style={{
+                  fontSize: '13px',
+                  color: '#ff4444',
+                  fontWeight: '600'
+                }}>
+                  ❌ Out of Stock
+                </span>
+              )}
               {isInCart && (
                 <span className="cart-quantity-indicator" style={{
                   fontSize: '13px',
@@ -1553,49 +1500,49 @@ function ProductPage({
                   createRipple(e);
                   handleAddToCart();
                 }}
-                disabled={isVariantOutOfStock || product.stock === 0}
+                disabled={availableStock === 0}
                 style={{
                   flex: 2,
-                  background: '#D4AF37',
-                  color: '#000',
+                  background: availableStock === 0 ? '#555' : '#D4AF37',
+                  color: availableStock === 0 ? '#888' : '#000',
                   border: 'none',
                   padding: '14px 20px',
                   fontSize: '16px',
                   fontWeight: 'bold',
                   borderRadius: '8px',
-                  cursor: isVariantOutOfStock || product.stock === 0 ? 'not-allowed' : 'pointer',
+                  cursor: availableStock === 0 ? 'not-allowed' : 'pointer',
                   transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                   position: 'relative',
                   overflow: 'hidden',
-                  opacity: (isVariantOutOfStock || product.stock === 0) ? 0.5 : 1
+                  opacity: availableStock === 0 ? 0.6 : 1
                 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: availableStock === 0 ? 1 : 1.02 }}
+                whileTap={{ scale: availableStock === 0 ? 1 : 0.95 }}
               >
                 <span className="btn-content" style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
                   <span className="btn-icon">🛒</span>
-                  {isVariantOutOfStock || product.stock === 0 ? 'Out of Stock' : (isInCart ? '🔄 Update Cart' : 'Add to Cart')}
+                  {availableStock === 0 ? 'Out of Stock' : (isInCart ? '🔄 Update Cart' : 'Add to Cart')}
                 </span>
               </motion.button>
               <motion.button 
                 className="buy-now-btn" 
                 onClick={handleBuyNow}
-                disabled={isVariantOutOfStock || product.stock === 0}
+                disabled={availableStock === 0}
                 style={{
                   flex: 1,
-                  background: themeStyles.color === '#ffffff' ? '#fff' : '#222',
-                  color: themeStyles.color === '#ffffff' ? '#000' : '#fff',
+                  background: availableStock === 0 ? '#333' : (themeStyles.color === '#ffffff' ? '#fff' : '#222'),
+                  color: availableStock === 0 ? '#666' : (themeStyles.color === '#ffffff' ? '#000' : '#fff'),
                   border: 'none',
                   padding: '14px 20px',
                   fontSize: '16px',
                   fontWeight: 'bold',
                   borderRadius: '8px',
-                  cursor: isVariantOutOfStock || product.stock === 0 ? 'not-allowed' : 'pointer',
+                  cursor: availableStock === 0 ? 'not-allowed' : 'pointer',
                   transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                  opacity: (isVariantOutOfStock || product.stock === 0) ? 0.5 : 1
+                  opacity: availableStock === 0 ? 0.5 : 1
                 }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: availableStock === 0 ? 1 : 1.02 }}
+                whileTap={{ scale: availableStock === 0 ? 1 : 0.95 }}
               >
                 Buy Now
               </motion.button>
@@ -1656,6 +1603,11 @@ function ProductPage({
                 {product.description || 'Premium quality product.'}
               </p>
             </div>
+
+            {/* ✅ FAQ Section */}
+            {product.faqs && product.faqs.length > 0 && (
+              <FAQSection faqs={product.faqs} isDarkMode={isDarkMode} />
+            )}
 
             {/* Product Specs */}
             <div className="product-specs" style={{ marginTop: '16px' }}>
@@ -2034,8 +1986,7 @@ function ProductPage({
             }}>
               {fullscreenIndex + 1} / {allMedia.length}
               {allMedia[fullscreenIndex] && 
-                ` - ${isVideoUrl(allMedia[fullscreenIndex]) ? '🎬 Video' : '📸 Image'}`
-              }
+                ` - ${isVideoUrl(allMedia[fullscreenIndex]) ? '🎬 Video' : '📸 Image'}`}
             </div>
             
             <div className="modal-swipe-hint" style={{

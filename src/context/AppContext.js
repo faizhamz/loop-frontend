@@ -26,15 +26,14 @@ export function AppProvider({ children }) {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Notifications
+  // ============ NOTIFICATIONS STATE ============
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationLoading, setNotificationLoading] = useState(false);
 
   // ============ THEME STATE ============
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Load from localStorage on initial render
     const savedTheme = localStorage.getItem('loop_theme');
-    // Default to 'light' if not saved
     return savedTheme ? savedTheme === 'dark' : false;
   });
 
@@ -44,10 +43,6 @@ export function AppProvider({ children }) {
 
   // Load from localStorage
   useEffect(() => {
-    const savedNotifications = localStorage.getItem('loop_notifications');
-    if (savedNotifications) {
-      setNotifications(JSON.parse(savedNotifications));
-    }
     const userData = localStorage.getItem('loop_user');
     if (userData) {
       setUser(JSON.parse(userData));
@@ -60,17 +55,12 @@ export function AppProvider({ children }) {
   }, [recentlyViewed]);
 
   useEffect(() => {
-    localStorage.setItem('loop_notifications', JSON.stringify(notifications));
-  }, [notifications]);
-
-  useEffect(() => {
     localStorage.setItem('loop_user', JSON.stringify(user));
   }, [user]);
 
   // ============ SAVE THEME ============
   useEffect(() => {
     localStorage.setItem('loop_theme', isDarkMode ? 'dark' : 'light');
-    // Apply theme class to body
     if (isDarkMode) {
       document.body.classList.add('dark-theme');
       document.body.classList.remove('light-theme');
@@ -93,88 +83,138 @@ export function AppProvider({ children }) {
   };
 
   // ============ RECENTLY VIEWED FUNCTIONS ============
-  
-  // ✅ Add to recently viewed
   const addToRecentlyViewed = (product) => {
     if (!product) return;
-    
     setRecentlyViewed(prev => {
-      // Remove duplicate if already exists
       const filtered = prev.filter(item => item._id !== product._id);
-      // Add to front, keep max 10 items
       const updated = [product, ...filtered].slice(0, 10);
       localStorage.setItem('loop_recently_viewed', JSON.stringify(updated));
       return updated;
     });
   };
 
-  // ✅ Remove single item from recently viewed
   const removeFromRecentlyViewed = (productId) => {
-  if (!productId) return;
-  
-  setRecentlyViewed(prev => {
-    const updated = prev.filter(item => {
-      // Try multiple ID fields
-      const itemId = item._id || item.id || item.productId;
-      return itemId !== productId;
+    if (!productId) return;
+    setRecentlyViewed(prev => {
+      const updated = prev.filter(item => {
+        const itemId = item._id || item.id || item.productId;
+        return itemId !== productId;
+      });
+      localStorage.setItem('loop_recently_viewed', JSON.stringify(updated));
+      return updated;
     });
-    localStorage.setItem('loop_recently_viewed', JSON.stringify(updated));
-    return updated;
-  });
-};
+  };
 
-  // ✅ Clear all recently viewed
   const clearRecentlyViewed = () => {
     setRecentlyViewed([]);
     localStorage.removeItem('loop_recently_viewed');
   };
 
-  // Notifications
+  // ============================================
+  // ✅ NOTIFICATION FUNCTIONS
+  // ============================================
+
+  // Load user notifications from database
   const loadNotifications = async () => {
+    const token = localStorage.getItem('loop_token');
+    if (!token) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    setNotificationLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/notifications/active`);
-      setNotifications(response.data);
-      setUnreadCount(response.data.length);
+      // Get user notifications with read status
+      const response = await axios.get(`${API_URL}/api/notifications/user`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const data = response.data || [];
+      setNotifications(data);
+      
+      // Count unread
+      const unread = data.filter(n => !n.isRead).length;
+      setUnreadCount(unread);
+      
+      console.log(`📬 Loaded ${data.length} notifications, ${unread} unread`);
     } catch (error) {
       console.error('Error loading notifications:', error);
+    } finally {
+      setNotificationLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
+  // Mark single notification as read
+  const markNotificationAsRead = async (notificationId) => {
+    const token = localStorage.getItem('loop_token');
+    if (!token) return;
 
-  const addNotification = (message, type = 'info', link = null) => {
-    const newNotification = {
-      id: Date.now(),
-      message,
-      type,
-      link,
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-    setNotifications(prev => [newNotification, ...prev]);
-    setUnreadCount(prev => prev + 1);
+    try {
+      await axios.post(
+        `${API_URL}/api/notifications/mark-read/${notificationId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n =>
+          n._id === notificationId ? { ...n, isRead: true } : n
+        )
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error('Error marking notification read:', error);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    setUnreadCount(0);
+  // Mark all notifications as read
+  const markAllNotificationsAsRead = async () => {
+    const token = localStorage.getItem('loop_token');
+    if (!token) return;
+
+    try {
+      await axios.post(
+        `${API_URL}/api/notifications/mark-all-read`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Update local state
+      setNotifications(prev =>
+        prev.map(n => ({ ...n, isRead: true }))
+      );
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Error marking all notifications read:', error);
+    }
   };
 
-  const markAsRead = (id) => {
-    setNotifications(prev => prev.map(n => 
-      n.id === id ? { ...n, read: true } : n
-    ));
-    setUnreadCount(prev => Math.max(0, prev - 1));
-  };
-
+  // Clear notifications (local only)
   const clearNotifications = () => {
     setNotifications([]);
     setUnreadCount(0);
   };
 
-  // Search functions
+  // Add notification (for admin panel)
+  const addNotification = async (message, type = 'info', link = null) => {
+    const token = localStorage.getItem('loop_token');
+    if (!token) return;
+
+    try {
+      await axios.post(
+        `${API_URL}/api/notifications`,
+        { message, type, link, targetType: 'all' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await loadNotifications();
+    } catch (error) {
+      console.error('Error adding notification:', error);
+    }
+  };
+
+  // ============ SEARCH FUNCTIONS ============
   const performSearch = (query, productList) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -188,12 +228,12 @@ export function AppProvider({ children }) {
     setSearchResults(results);
   };
 
-  // Toggle theme
+  // ============ THEME TOGGLE ============
   const toggleTheme = () => {
     setIsDarkMode(prev => !prev);
   };
 
-  // Banner functions
+  // ============ BANNER FUNCTIONS ============
   const refreshBanners = async () => {
     setBannerLoading(true);
     try {
@@ -208,6 +248,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     refreshBanners();
+    loadNotifications();
   }, []);
 
   // ============ CONTEXT VALUE ============
@@ -234,19 +275,20 @@ export function AppProvider({ children }) {
     setShowSearchModal,
     performSearch,
     
-    // Recently Viewed - ✅ ALL THREE FUNCTIONS
+    // Recently Viewed
     recentlyViewed,
     addToRecentlyViewed,
-    removeFromRecentlyViewed,   // ✅ NEW - Delete individual items
+    removeFromRecentlyViewed,
     clearRecentlyViewed,
     
-    // Notifications
+    // ✅ Notifications - Updated
     notifications,
     unreadCount,
+    notificationLoading,
     loadNotifications,
     addNotification,
-    markAllAsRead,
-    markAsRead,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
     clearNotifications,
     
     // Theme

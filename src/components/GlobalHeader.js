@@ -30,11 +30,12 @@ function GlobalHeader({
     performSearch,
     notifications,
     unreadCount,
-    markAllAsRead,
-    markAsRead,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
     clearNotifications,
     addToRecentlyViewed,
-    isDarkMode
+    isDarkMode,
+    loadNotifications
   } = useApp();
   
   const navigate = useNavigate();
@@ -127,7 +128,48 @@ function GlobalHeader({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Reload notifications when dropdown opens
+  useEffect(() => {
+    if (showNotifications && isLoggedIn) {
+      loadNotifications();
+    }
+  }, [showNotifications, isLoggedIn]);
+
   const totalCartItems = cart.reduce((s, i) => s + i.quantity, 0);
+
+  // ✅ Handle notification click
+  const handleNotificationClick = async (notification) => {
+    // Mark as read
+    if (!notification.isRead) {
+      await markNotificationAsRead(notification._id);
+    }
+    
+    // Navigate if link exists
+    if (notification.link) {
+      navigate(notification.link);
+    }
+    
+    setShowNotifications(false);
+  };
+
+  // ✅ Handle mark all read
+  const handleMarkAllRead = async () => {
+    await markAllNotificationsAsRead();
+  };
+
+  // ✅ Format time ago
+  const timeAgo = (date) => {
+    const diff = Date.now() - new Date(date).getTime();
+    const mins = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return new Date(date).toLocaleDateString();
+  };
 
   return (
     <header className={`header ${scrolled ? 'header-scrolled' : ''}`}>
@@ -226,15 +268,42 @@ function GlobalHeader({
             )}
           </Link>
 
+          {/* ✅ NOTIFICATION BELL - Updated UI */}
           <div className="notification-wrapper" ref={notificationRef}>
             <button 
               className="notification-bell"
               onClick={() => setShowNotifications(!showNotifications)}
               aria-label="Notifications"
+              style={{
+                position: 'relative',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px 8px',
+                borderRadius: '50%',
+                transition: 'all 0.3s ease',
+                fontSize: '22px',
+                color: isDarkMode ? '#fff' : '#2d1b2e'
+              }}
             >
               🔔
               {unreadCount > 0 && (
-                <span className="notification-count">{unreadCount}</span>
+                <span className="notification-count" style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '0px',
+                  background: '#ff4444',
+                  color: '#fff',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  padding: '1px 6px',
+                  borderRadius: '50%',
+                  minWidth: '18px',
+                  textAlign: 'center',
+                  animation: 'bounceIn 0.4s ease'
+                }}>
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
               )}
             </button>
             
@@ -246,47 +315,224 @@ function GlobalHeader({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
+                  style={{
+                    position: 'absolute',
+                    top: '40px',
+                    right: '0',
+                    background: isDarkMode ? '#1a1a1a' : '#ffffff',
+                    border: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5',
+                    borderRadius: '16px',
+                    width: '380px',
+                    maxHeight: '450px',
+                    overflow: 'hidden',
+                    boxShadow: isDarkMode ? '0 8px 40px rgba(0,0,0,0.4)' : '0 8px 40px rgba(0,0,0,0.1)',
+                    zIndex: 1000,
+                    display: 'flex',
+                    flexDirection: 'column'
+                  }}
                 >
-                  <div className="notification-header">
-                    <span>Notifications</span>
-                    <div className="notification-actions">
+                  {/* Header */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: isDarkMode ? '1px solid #333' : '1px solid #f0e8ed',
+                    flexShrink: 0
+                  }}>
+                    <span style={{
+                      fontSize: '16px',
+                      fontWeight: '700',
+                      color: isDarkMode ? '#fff' : '#2d1b2e',
+                      fontFamily: 'Nunito, sans-serif'
+                    }}>
+                      🔔 Notifications
+                      {unreadCount > 0 && (
+                        <span style={{
+                          marginLeft: '8px',
+                          background: '#ff4444',
+                          color: '#fff',
+                          fontSize: '10px',
+                          padding: '2px 10px',
+                          borderRadius: '12px'
+                        }}>
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       {notifications.length > 0 && (
                         <>
-                          <button onClick={markAllAsRead}>Mark all read</button>
-                          <button onClick={clearNotifications}>Clear all</button>
+                          <button 
+                            onClick={handleMarkAllRead}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#D4AF37',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              transition: 'all 0.3s ease',
+                              fontWeight: '500'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(212, 175, 55, 0.08)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          >
+                            Mark all read
+                          </button>
+                          <button 
+                            onClick={clearNotifications}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#888',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 68, 68, 0.05)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                          >
+                            Clear all
+                          </button>
                         </>
                       )}
                     </div>
                   </div>
-                  <div className="notification-list">
+
+                  {/* Notification List */}
+                  <div style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    maxHeight: '350px'
+                  }}>
                     {notifications.length === 0 ? (
-                      <p className="no-notifications">No notifications</p>
+                      <div style={{
+                        padding: '40px 20px',
+                        textAlign: 'center',
+                        color: '#888'
+                      }}>
+                        <div style={{ fontSize: '40px', marginBottom: '8px' }}>✨</div>
+                        <p>No notifications yet</p>
+                        <p style={{ fontSize: '12px', marginTop: '4px' }}>We'll notify you when something happens</p>
+                      </div>
                     ) : (
-                      notifications.slice(0, 10).map(notif => (
+                      notifications.slice(0, 20).map(notif => (
                         <motion.div 
-                          key={notif.id} 
-                          className={`notification-item ${notif.read ? 'read' : 'unread'}`}
-                          onClick={() => {
-                            markAsRead(notif.id);
-                            if (notif.link) navigate(notif.link);
-                            setShowNotifications(false);
-                          }}
+                          key={notif._id} 
+                          className={`notification-item ${notif.isRead ? 'read' : 'unread'}`}
+                          onClick={() => handleNotificationClick(notif)}
                           whileHover={{ x: 4 }}
                           transition={{ duration: 0.2 }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '12px',
+                            padding: '12px 20px',
+                            cursor: 'pointer',
+                            borderBottom: isDarkMode ? '1px solid #222' : '1px solid #f0e8ed',
+                            transition: 'all 0.3s ease',
+                            background: notif.isRead ? 'transparent' : isDarkMode ? 'rgba(212, 175, 55, 0.05)' : 'rgba(212, 175, 55, 0.03)'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = isDarkMode ? '#222' : '#f8f4f9';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = notif.isRead ? 'transparent' : isDarkMode ? 'rgba(212, 175, 55, 0.05)' : 'rgba(212, 175, 55, 0.03)';
+                          }}
                         >
-                          <span className="notification-icon">
-                            {notif.type === 'success' ? '✅' : 
-                             notif.type === 'error' ? '❌' : 
-                             notif.type === 'warning' ? '⚠️' : 'ℹ️'}
-                          </span>
-                          <span className="notification-message">{notif.message}</span>
-                          <span className="notification-time">
-                            {new Date(notif.createdAt).toLocaleDateString()}
-                          </span>
+                          {!notif.isRead && (
+                            <span style={{
+                              width: '8px',
+                              height: '8px',
+                              background: '#D4AF37',
+                              borderRadius: '50%',
+                              flexShrink: 0,
+                              marginTop: '6px'
+                            }} />
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: '13px',
+                              color: isDarkMode ? '#fff' : '#2d1b2e',
+                              lineHeight: '1.4',
+                              wordBreak: 'break-word'
+                            }}>
+                              {notif.message}
+                            </div>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              marginTop: '4px'
+                            }}>
+                              <span style={{
+                                fontSize: '11px',
+                                color: '#888'
+                              }}>
+                                {timeAgo(notif.createdAt)}
+                              </span>
+                              {notif.orderId && (
+                                <span style={{
+                                  fontSize: '10px',
+                                  color: '#D4AF37',
+                                  background: 'rgba(212, 175, 55, 0.1)',
+                                  padding: '1px 8px',
+                                  borderRadius: '10px'
+                                }}>
+                                  📦 Order
+                                </span>
+                              )}
+                              {notif.orderStatus && (
+                                <span style={{
+                                  fontSize: '10px',
+                                  padding: '1px 8px',
+                                  borderRadius: '10px',
+                                  background: notif.orderStatus === 'delivered' ? 'rgba(40, 167, 69, 0.1)' :
+                                            notif.orderStatus === 'cancelled' ? 'rgba(255, 68, 68, 0.1)' :
+                                            'rgba(212, 175, 55, 0.1)',
+                                  color: notif.orderStatus === 'delivered' ? '#28a745' :
+                                         notif.orderStatus === 'cancelled' ? '#ff4444' :
+                                         '#D4AF37'
+                                }}>
+                                  {notif.orderStatus}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {notif.link && (
+                            <span style={{
+                              color: '#D4AF37',
+                              fontSize: '12px',
+                              flexShrink: 0
+                            }}>
+                              →
+                            </span>
+                          )}
                         </motion.div>
                       ))
                     )}
                   </div>
+
+                  {/* Footer */}
+                  {notifications.length > 0 && (
+                    <div style={{
+                      padding: '10px 20px',
+                      borderTop: isDarkMode ? '1px solid #333' : '1px solid #f0e8ed',
+                      textAlign: 'center',
+                      flexShrink: 0
+                    }}>
+                      <span style={{
+                        fontSize: '11px',
+                        color: '#888'
+                      }}>
+                        {notifications.length} notifications • {unreadCount} unread
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

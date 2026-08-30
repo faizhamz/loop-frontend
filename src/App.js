@@ -7,13 +7,10 @@ import './pages/OrderHistory.css';
 import { AppProvider, useApp } from './context/AppContext';
 import axios from 'axios';
 
-// ✅ API_URL - REQUIRED FOR PRODUCT FETCHING
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
-// ✅ Import cart sync utilities
 import { syncCartToDatabase, loadCartFromDatabase, clearCartInDatabase } from './utils/cartSync';
 
-// ✅ COMPONENTS - These must be imported (not lazy loaded)
 import GlobalToast from './components/GlobalToast';
 import Sparkles from './components/Sparkles';
 import SearchModal from './components/SearchModal';
@@ -21,7 +18,6 @@ import GlobalHeader from './components/GlobalHeader';
 import RecentlyViewed from './components/RecentlyViewed';
 import ProfileCompletion from './components/ProfileCompletion';
 
-// ✅ LAZY LOAD PAGES
 const AdminLogin = lazy(() => import('./admin/AdminLogin'));
 const AdminDashboard = lazy(() => import('./admin/AdminDashboard'));
 const Auth = lazy(() => import('./components/Auth'));
@@ -35,8 +31,8 @@ const Addresses = lazy(() => import('./pages/Addresses'));
 const Contact = lazy(() => import('./pages/Contact'));
 const OrderConfirmation = lazy(() => import('./pages/OrderConfirmation'));
 const CategoryPage = lazy(() => import('./pages/CategoryPage'));
+const ReferralPage = lazy(() => import('./pages/ReferralPage'));
 
-// ✅ LOADING COMPONENT
 const PageLoader = () => (
   <div style={{ 
     minHeight: '100vh', 
@@ -49,7 +45,6 @@ const PageLoader = () => (
   </div>
 );
 
-// Page transition variants
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
@@ -61,7 +56,6 @@ const pageTransition = {
   ease: [0.25, 0.46, 0.45, 0.94]
 };
 
-// Wrapper component that uses AppContext
 function AppContent() {
   const location = useLocation();
   const { 
@@ -84,7 +78,7 @@ function AppContent() {
   const [loading, setLoading] = useState(true);
   const [cartAnimation, setCartAnimation] = useState(false);
 
-  // ✅ Global Error Handler
+  // Global Error Handler
   useEffect(() => {
     const handleGlobalError = (event) => {
       console.error('❌ Runtime error:', event.error || event.message);
@@ -139,7 +133,7 @@ function AppContent() {
     }
   };
 
-  // ✅ Load user and cart on mount
+  // Load user and cart on mount
   useEffect(() => {
     fetchProducts();
     trackVisitor();
@@ -189,21 +183,21 @@ function AppContent() {
     }
   }, []);
 
-  // ✅ Save cart to localStorage whenever it changes
+  // Save cart to localStorage whenever it changes
   useEffect(() => {
     if (cart.length > 0 || localStorage.getItem('loop_cart')) {
       localStorage.setItem('loop_cart', JSON.stringify(cart));
     }
   }, [cart]);
 
-  // ✅ Save wishlist to localStorage whenever it changes
+  // Save wishlist to localStorage whenever it changes
   useEffect(() => {
     if (wishlist.length > 0 || localStorage.getItem('loop_wishlist')) {
       localStorage.setItem('loop_wishlist', JSON.stringify(wishlist));
     }
   }, [wishlist]);
 
-  // ✅ Handle login with cart sync
+  // Handle login with cart sync
   const handleLogin = async (userData, token) => {
     if (token) {
       localStorage.setItem('loop_token', token);
@@ -213,10 +207,8 @@ function AppContent() {
       setUser(userData);
       setIsLoggedIn(true);
       
-      // ✅ Sync local cart to database
       await syncCartToDatabase(userData.id);
       
-      // ✅ Load database cart (which now includes synced items)
       const dbCart = await loadCartFromDatabase();
       if (dbCart && dbCart.length > 0) {
         setCart(dbCart);
@@ -231,7 +223,7 @@ function AppContent() {
     }
   };
 
-  // ✅ Handle logout with cart clear
+  // Handle logout with cart clear
   const handleLogout = async () => {
     await clearCartInDatabase();
     localStorage.removeItem('loop_token');
@@ -256,16 +248,12 @@ function AppContent() {
     }
   };
 
-  // ✅ Helper function to get product ID from any cart item
   const getProductId = (item) => {
     return item?.id || item?._id || item?.productId || null;
   };
 
-  // ✅ FIXED: Add to cart with proper localStorage sync and ID handling
   const addToCart = async (product, selectedSize, quantity = 1) => {
-    // Try multiple ID field names
     const productId = product?._id || product?.id || product?.productId;
-    
     if (!productId) {
       console.error('❌ Cannot add: Invalid product', product);
       return;
@@ -301,10 +289,8 @@ function AppContent() {
         }];
       }
       
-      // ✅ Update localStorage
       localStorage.setItem('loop_cart', JSON.stringify(updatedCart));
       
-      // ✅ Sync to database if logged in
       if (isLoggedIn && user) {
         syncCartToDatabase(user.id);
       }
@@ -314,9 +300,7 @@ function AppContent() {
     });
   };
 
-  // ✅ FIXED: Remove from cart with multiple ID support
   const removeFromCart = (id, size) => {
-    // If id is an object, extract the ID
     let productId = id;
     let itemSize = size;
     
@@ -344,10 +328,8 @@ function AppContent() {
         });
       }
       
-      // ✅ Update localStorage
       localStorage.setItem('loop_cart', JSON.stringify(updatedCart));
       
-      // ✅ Sync to database if logged in
       if (isLoggedIn && user) {
         syncCartToDatabase(user.id);
       }
@@ -356,9 +338,7 @@ function AppContent() {
     });
   };
 
-  // ✅ FIXED: Update quantity with multiple ID support
   const updateQuantity = (id, newQty, size) => {
-    // If id is an object, extract the ID
     let productId = id;
     let itemSize = size;
     
@@ -397,10 +377,8 @@ function AppContent() {
         });
       }
       
-      // ✅ Update localStorage
       localStorage.setItem('loop_cart', JSON.stringify(updatedCart));
       
-      // ✅ Sync to database if logged in
       if (isLoggedIn && user) {
         syncCartToDatabase(user.id);
       }
@@ -443,9 +421,14 @@ function AppContent() {
     );
   }
 
+  // ✅ Determine if Recently Viewed should be shown
+  const showRecentlyViewed = 
+    location.pathname === '/' || 
+    location.pathname.startsWith('/product/') || 
+    location.pathname.startsWith('/category/');
+
   return (
     <div className={`App ${isDarkMode ? 'dark-theme' : 'light-theme'}`}>
-      {/* ✅ DEFAULT META TAGS */}
       <Helmet>
         <title>LOOP - Make Your Move | Premium Fashion</title>
         <meta name="description" content="Shop premium fashion at LOOP. Free delivery on orders above ₹999. 14-day return policy. Best quality fabrics." />
@@ -460,7 +443,6 @@ function AppContent() {
         <meta name="twitter:description" content="Shop premium fashion at LOOP. Free delivery on orders above ₹999." />
       </Helmet>
 
-      {/* Toast Notification */}
       <GlobalToast 
         show={toast.show} 
         message={toast.message} 
@@ -468,16 +450,13 @@ function AppContent() {
         onHide={hideToast} 
       />
       
-      {/* Floating Sparkles */}
       <Sparkles />
       
-      {/* Search Modal */}
       <SearchModal 
         products={products} 
         addToRecentlyViewed={addToRecentlyViewed} 
       />
 
-      {/* Global Header */}
       <GlobalHeader 
         cart={cart}
         wishlist={wishlist}
@@ -489,7 +468,6 @@ function AppContent() {
         cartAnimation={cartAnimation}
       />
       
-      {/* Page Routes */}
       <AnimatePresence mode="wait">
         <motion.div
           key={location.pathname}
@@ -506,23 +484,14 @@ function AppContent() {
               } />
               
               <Route path="/login" element={
-                <Auth 
-                  onLogin={handleLogin} 
-                  setUser={setUser}
-                />
+                <Auth onLogin={handleLogin} setUser={setUser} />
               } />
               <Route path="/signup" element={
-                <Auth 
-                  onLogin={handleLogin} 
-                  setUser={setUser}
-                />
+                <Auth onLogin={handleLogin} setUser={setUser} />
               } />
               
               <Route path="/profile-completion" element={
-                <ProfileCompletion 
-                  user={user} 
-                  setUser={setUser}
-                />
+                <ProfileCompletion user={user} setUser={setUser} />
               } />
               
               <Route path="/product/:slug" element={
@@ -563,19 +532,14 @@ function AppContent() {
               } />
               
               <Route path="/orders" element={
-                <OrderHistory 
-                  user={user}
-                  isLoggedIn={isLoggedIn}
-                />
+                <OrderHistory user={user} isLoggedIn={isLoggedIn} />
               } />
               
               <Route path="/profile" element={
-                <Profile 
-                  user={user} 
-                  setUser={setUser}
-                  showToast={showToast}
-                />
+                <Profile user={user} setUser={setUser} showToast={showToast} />
               } />
+              
+              <Route path="/referral" element={<ReferralPage />} />
               
               <Route path="/addresses" element={<Addresses />} />
               <Route path="/contact" element={<Contact />} />
@@ -605,8 +569,8 @@ function AppContent() {
         </motion.div>
       </AnimatePresence>
 
-      {/* Recently Viewed Section - Hide on Checkout, Order Confirmation, etc. */}
-      {!['/checkout', '/order-confirmation', '/login', '/signup', '/profile'].includes(location.pathname) && (
+      {/* ✅ Recently Viewed - Only on Homepage, Product, and Category pages */}
+      {showRecentlyViewed && (
         <RecentlyViewed addToCart={addToCart} />
       )}
 
@@ -660,7 +624,6 @@ function AppContent() {
   );
 }
 
-// Main App with Provider
 function App() {
   return (
     <AppProvider>
