@@ -97,7 +97,7 @@ function HomePage({
     if (e) e.stopPropagation();
     if (!product) return;
     
-    // ✅ Check stock before adding
+    // Check stock before adding
     const availableStock = product.stock || 0;
     if (availableStock === 0) {
       alert('⚠️ This product is out of stock!');
@@ -174,7 +174,7 @@ function HomePage({
 
   return (
     <div className="App">
-      {/* ✅ META TAGS FOR HOMEPAGE */}
+      {/* META TAGS FOR HOMEPAGE */}
       <Helmet>
         <title>LOOP - Make Your Move | Premium Fashion Store</title>
         <meta name="description" content="Shop the latest premium fashion at LOOP. Free delivery on orders above ₹999. 14-day return policy. Best quality fabrics and unique styles." />
@@ -203,7 +203,7 @@ function HomePage({
         </script>
       </Helmet>
 
-      {/* ✅ HERO SECTION - ORIGINAL */}
+      {/* HERO SECTION */}
       <motion.section 
         className="hero hero-homepage"
         initial={{ opacity: 0 }}
@@ -316,11 +316,7 @@ function HomePage({
       <section className="category-section">
         <div className="container">
           <div className="category-section-header">
-<<<<<<< HEAD
             <h2 className="category-section-title"> Explore By Category</h2>
-=======
-            <h2 className="category-section-title">Explore By Category</h2>
->>>>>>> a7f8f574df23959bafc1b1c5d2f8ea6bbf2f8128
             {(categories || []).length > 0 && (
               <span className="category-section-count">{(categories || []).length} Categories</span>
             )}
@@ -499,7 +495,7 @@ function HomePage({
                               opacity: quantity >= availableStock ? 0.4 : 1,
                               cursor: quantity >= availableStock ? 'not-allowed' : 'pointer'
                             }}
-                          >+</motion.button>
+                          >+</button>
                         </div>
                       ) : (
                         <motion.button 
