@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import ReviewModal from '../components/ReviewModal';
 import './OrderHistory.css';
@@ -8,6 +8,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onre
 
 function OrderHistory({ user, isLoggedIn }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -101,6 +102,31 @@ function OrderHistory({ user, isLoggedIn }) {
     
     fetchOrders();
   }, []);
+
+  // ✅ NEW: Scroll to and highlight specific order from URL
+  useEffect(() => {
+    // Check if we're navigating to a specific order
+    const pathParts = location.pathname.split('/');
+    const orderIdFromUrl = pathParts[pathParts.length - 1];
+    
+    if (orderIdFromUrl && orderIdFromUrl !== 'orders' && orders.length > 0) {
+      // Wait for orders to load, then scroll to the order
+      const timer = setTimeout(() => {
+        const orderElement = document.getElementById(`order-${orderIdFromUrl}`);
+        if (orderElement) {
+          orderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          orderElement.style.border = '2px solid #D4AF37';
+          orderElement.style.boxShadow = '0 0 30px rgba(212, 175, 55, 0.2)';
+          // Remove highlight after 5 seconds
+          setTimeout(() => {
+            orderElement.style.border = '';
+            orderElement.style.boxShadow = '';
+          }, 5000);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [location.pathname, orders]);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -379,12 +405,20 @@ function OrderHistory({ user, isLoggedIn }) {
                 filteredOrders.map((order, index) => {
                   const isExpanded = selectedOrder === order._id;
                   const showRating = order.status === 'delivered' && !order.postOrderRating;
+                  const isHighlighted = location.pathname.includes(order.orderId);
 
                   return (
                     <div 
                       key={order._id} 
-                      className={`order-card ${isExpanded ? 'expanded' : ''}`}
-                      style={{ animationDelay: `${index * 0.05}s` }}
+                      id={`order-${order.orderId}`}  // ✅ Add ID for scrolling
+                      className={`order-card ${isExpanded ? 'expanded' : ''} ${isHighlighted ? 'highlighted' : ''}`}
+                      style={{ 
+                        animationDelay: `${index * 0.05}s`,
+                        ...(isHighlighted && {
+                          border: '2px solid #D4AF37',
+                          boxShadow: '0 0 30px rgba(212, 175, 55, 0.2)'
+                        })
+                      }}
                     >
                       <div className="order-header">
                         <div className="order-header-left">

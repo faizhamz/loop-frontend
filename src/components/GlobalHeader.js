@@ -32,7 +32,7 @@ function GlobalHeader({
     unreadCount,
     markNotificationAsRead,
     markAllNotificationsAsRead,
-    clearAllNotifications,  // ✅ Import clearAllNotifications
+    clearAllNotifications,
     clearNotifications,
     addToRecentlyViewed,
     isDarkMode,
@@ -138,16 +138,21 @@ function GlobalHeader({
 
   const totalCartItems = cart.reduce((s, i) => s + i.quantity, 0);
 
-  // Handle notification click
+  // ✅ UPDATED: Handle notification click with better navigation
   const handleNotificationClick = async (notification) => {
     // Mark as read
     if (!notification.isRead) {
       await markNotificationAsRead(notification._id);
     }
     
-    // Navigate if link exists
+    // ✅ Navigate if link exists
     if (notification.link) {
-      navigate(notification.link);
+      // Check if link is an order link
+      if (notification.link.startsWith('/orders/')) {
+        navigate(notification.link);
+      } else {
+        navigate(notification.link);
+      }
     }
     
     setShowNotifications(false);
@@ -359,7 +364,6 @@ function GlobalHeader({
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {notifications.length > 0 && (
                         <>
-                          {/* ✅ Mark all read button */}
                           <button 
                             onClick={markAllNotificationsAsRead}
                             style={{
@@ -378,7 +382,6 @@ function GlobalHeader({
                           >
                             ✅ Mark all read
                           </button>
-                          {/* ✅ Clear all button - actually deletes */}
                           <button 
                             onClick={clearAllNotifications}
                             style={{

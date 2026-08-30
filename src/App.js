@@ -531,6 +531,10 @@ function AppContent() {
                 />
               } />
               
+              {/* ✅ Order History Routes - Both with and without ID */}
+              <Route path="/orders/:orderId" element={
+                <OrderHistory user={user} isLoggedIn={isLoggedIn} />
+              } />
               <Route path="/orders" element={
                 <OrderHistory user={user} isLoggedIn={isLoggedIn} />
               } />
