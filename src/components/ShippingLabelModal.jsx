@@ -41,13 +41,13 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
       
       const timer = setTimeout(() => {
         handleDownload();
-      }, 1000);
+      }, 1500);
       
       return () => clearTimeout(timer);
     }
   }, [generatedLabel]);
 
-  // ✅ DOWNLOAD FUNCTION
+  // ✅ DOWNLOAD FUNCTION - Fixed
   const handleDownload = () => {
     if (!generatedLabel?.downloadUrl) {
       console.error('❌ No download URL available');
@@ -56,33 +56,41 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
     }
 
     const token = localStorage.getItem('loop_token');
-    const downloadUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${token}`;
     
-    console.log('📥 Attempting download from:', downloadUrl);
+    // ✅ Pass token as URL parameter
+    const downloadUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${encodeURIComponent(token)}`;
     
-    try {
-      const win = window.open(downloadUrl, '_blank');
-      
-      if (win) {
-        console.log('✅ Download window opened');
-        setDownloadSuccess(true);
-      } else {
+    console.log('📥 Downloading from:', downloadUrl);
+    
+    // ✅ Use fetch to download with token
+    fetch(downloadUrl)
+      .then(response => {
+        console.log('📥 Response status:', response.status);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        console.log('📥 File size:', blob.size, 'bytes');
+        const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.target = '_blank';
+        link.href = url;
         link.download = generatedLabel.downloadUrl.split('/').pop() || 'shipping-label.pdf';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
         setDownloadSuccess(true);
-      }
-    } catch (err) {
-      console.error('❌ Download failed:', err);
-      setError('Download failed. Please try again.');
-    }
+        console.log('✅ Download complete!');
+      })
+      .catch(err => {
+        console.error('❌ Download failed:', err);
+        setError('Download failed: ' + err.message);
+      });
   };
 
-  // ✅ PRINT FUNCTION - PREVIEW MODE (No auto-print)
+  // ✅ PRINT FUNCTION - Opens in new tab for preview
   const handlePrint = () => {
     if (!generatedLabel?.downloadUrl) {
       alert('No label to print. Please generate one first.');
@@ -90,16 +98,17 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
     }
     
     const token = localStorage.getItem('loop_token');
-    const printUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${token}`;
     
-    // ✅ Open in new tab - shows preview
+    // ✅ Pass token as URL parameter
+    const printUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${encodeURIComponent(token)}`;
+    
+    console.log('🖨️ Opening print preview:', printUrl);
+    
     const printWindow = window.open(printUrl, '_blank');
     
     if (printWindow) {
-      // ✅ Show preview only - user prints manually with Ctrl+P
-      console.log('🖨️ Label preview opened in new tab');
-      
-      // Optional: Show a small notification
+      console.log('✅ Preview tab opened');
+      // ✅ Show instruction alert
       setTimeout(() => {
         alert('📄 Label opened in new tab.\nUse Ctrl+P (Windows) or Cmd+P (Mac) to print.\nClose the tab when done.');
       }, 500);
