@@ -316,7 +316,11 @@ function HomePage({
       <section className="category-section">
         <div className="container">
           <div className="category-section-header">
+<<<<<<< HEAD
             <h2 className="category-section-title"> Explore By Category</h2>
+=======
+            <h2 className="category-section-title">Explore By Category</h2>
+>>>>>>> a7f8f574df23959bafc1b1c5d2f8ea6bbf2f8128
             {(categories || []).length > 0 && (
               <span className="category-section-count">{(categories || []).length} Categories</span>
             )}
