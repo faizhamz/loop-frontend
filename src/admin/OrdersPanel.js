@@ -91,11 +91,15 @@ function OrdersPanel() {
   // ============================================
   // ✅ NEW: Handle Label Generated
   // ============================================
-  const handleLabelGenerated = (labelData) => {
-    console.log('✅ Label generated:', labelData);
-    // Refresh orders to update tracking info
-    fetchOrders();
-  };
+const handleLabelGenerated = (labelData) => {
+  console.log('✅ Label generated:', labelData);
+  
+  // ✅ Show success toast or alert
+  alert(`✅ Shipping label generated!\nTracking: ${labelData.trackingNumber}\nDownload will start automatically.`);
+  
+  // Refresh orders
+  fetchOrders();
+};
 
   // ============================================
   // SEARCH FUNCTIONALITY

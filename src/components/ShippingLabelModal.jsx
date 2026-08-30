@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 
@@ -12,6 +12,19 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
   const [format, setFormat] = useState('thermal-4x6');
   const [generatedLabel, setGeneratedLabel] = useState(null);
   const [error, setError] = useState('');
+  const [downloadStarted, setDownloadStarted] = useState(false);
+
+  // ✅ Auto-download when label is generated
+  useEffect(() => {
+    if (generatedLabel && !downloadStarted) {
+      console.log('📦 Auto-downloading label...');
+      setDownloadStarted(true);
+      const timer = setTimeout(() => {
+        handleDownload();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [generatedLabel]);
 
   const couriers = [
     { value: 'delhivery', label: 'Delhivery' },
@@ -32,21 +45,39 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setDownloadStarted(false);
 
     try {
       const token = localStorage.getItem('loop_token');
+      console.log('📦 Generating label for order:', order._id);
+      
       const response = await axios.post(
         `${API_URL}/api/labels/generate/${order._id}`,
         { courier, courierName, instructions, format },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 30000
+        }
       );
+
+      console.log('✅ Label response:', response.data);
 
       if (response.data.success) {
         setGeneratedLabel(response.data);
         if (onLabelGenerated) onLabelGenerated(response.data);
+      } else {
+        setError(response.data?.error || 'Failed to generate label');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to generate label');
+      console.error('❌ Label generation error:', err);
+      
+      if (err.response) {
+        setError(`Server error (${err.response.status}): ${err.response.data?.error || err.message}`);
+      } else if (err.request) {
+        setError('No response from server. Please check your connection.');
+      } else {
+        setError('Error: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -55,7 +86,17 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
   const handleDownload = () => {
     if (generatedLabel?.downloadUrl) {
       const token = localStorage.getItem('loop_token');
-      window.open(`${API_URL}${generatedLabel.downloadUrl}?token=${token}`, '_blank');
+      const downloadUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${token}`;
+      console.log('📥 Downloading from:', downloadUrl);
+      
+      // Open in new tab for download
+      const win = window.open(downloadUrl, '_blank');
+      if (!win) {
+        // If popup blocked, use direct download
+        window.location.href = downloadUrl;
+      }
+    } else {
+      console.warn('⚠️ No download URL available');
     }
   };
 
@@ -74,10 +115,22 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
     }
   };
 
+  const resetModal = () => {
+    setGeneratedLabel(null);
+    setError('');
+    setDownloadStarted(false);
+    setLoading(false);
+  };
+
+  const handleClose = () => {
+    resetModal();
+    onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="label-modal-overlay" onClick={onClose}>
+    <div className="label-modal-overlay" onClick={handleClose}>
       <motion.div 
         className="label-modal"
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -87,7 +140,7 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
       >
         <div className="label-modal-header">
           <h3>📦 Shipping Label</h3>
-          <button className="label-modal-close" onClick={onClose}>✕</button>
+          <button className="label-modal-close" onClick={handleClose}>✕</button>
         </div>
 
         {!generatedLabel ? (
@@ -149,10 +202,26 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
               </div>
             </div>
 
-            {error && <div className="label-error">{error}</div>}
+            {error && (
+              <div className="label-error">
+                ❌ {error}
+                <button 
+                  onClick={() => setError('')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#ff4444',
+                    cursor: 'pointer',
+                    marginLeft: '8px'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             <div className="label-actions">
-              <button type="button" className="btn-secondary" onClick={onClose}>
+              <button type="button" className="btn-secondary" onClick={handleClose}>
                 Cancel
               </button>
               <button type="submit" className="btn-primary" disabled={loading}>
@@ -164,7 +233,14 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           <div className="label-generated">
             <div className="label-success-icon">✅</div>
             <h4>Label Generated Successfully!</h4>
-            <p>Tracking Number: <strong>{generatedLabel.trackingNumber}</strong></p>
+            <p>
+              Tracking Number: <strong>{generatedLabel.trackingNumber}</strong>
+            </p>
+            {generatedLabel.downloadUrl && (
+              <p style={{ fontSize: '12px', color: '#666' }}>
+                📄 {generatedLabel.downloadUrl.split('/').pop()}
+              </p>
+            )}
             
             <div className="label-preview-actions">
               <button className="btn-primary" onClick={handlePrint}>
@@ -173,13 +249,18 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
               <button className="btn-secondary" onClick={handleDownload}>
                 📥 Download PDF
               </button>
-              <button className="btn-secondary" onClick={() => setGeneratedLabel(null)}>
+              <button className="btn-secondary" onClick={resetModal}>
                 🔄 Generate New
               </button>
             </div>
 
             <div className="label-tip">
-              💡 Label is saved as <strong>label-{order.orderId}.pdf</strong>
+              💡 Label saved as <strong>{generatedLabel.downloadUrl?.split('/').pop() || 'label.pdf'}</strong>
+              {!downloadStarted && (
+                <span style={{ display: 'block', marginTop: '4px', color: '#D4AF37' }}>
+                  ⏳ Download will start automatically...
+                </span>
+              )}
             </div>
           </div>
         )}
@@ -321,6 +402,9 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           padding: 8px 12px;
           background: rgba(255, 68, 68, 0.1);
           border-radius: 6px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
 
         .label-actions {
@@ -393,6 +477,7 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           gap: 10px;
           flex-wrap: wrap;
           justify-content: center;
+          margin-top: 8px;
         }
 
         .label-preview-actions button {
