@@ -191,7 +191,27 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Clear notifications (local only)
+  // ✅ NEW: Clear all notifications (DELETE from database)
+  const clearAllNotifications = async () => {
+    const token = localStorage.getItem('loop_token');
+    if (!token) return;
+
+    try {
+      await axios.delete(
+        `${API_URL}/api/notifications/clear-all`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Clear local state
+      setNotifications([]);
+      setUnreadCount(0);
+      console.log('🗑️ All notifications cleared');
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+    }
+  };
+
+  // Clear notifications (local only - for UI hide)
   const clearNotifications = () => {
     setNotifications([]);
     setUnreadCount(0);
@@ -281,7 +301,7 @@ export function AppProvider({ children }) {
     removeFromRecentlyViewed,
     clearRecentlyViewed,
     
-    // ✅ Notifications - Updated
+    // ✅ Notifications - Updated with clearAllNotifications
     notifications,
     unreadCount,
     notificationLoading,
@@ -289,7 +309,8 @@ export function AppProvider({ children }) {
     addNotification,
     markNotificationAsRead,
     markAllNotificationsAsRead,
-    clearNotifications,
+    clearAllNotifications,  // ✅ NEW - Deletes from database
+    clearNotifications,     // Local only - hides from UI
     
     // Theme
     isDarkMode,

@@ -32,6 +32,7 @@ function GlobalHeader({
     unreadCount,
     markNotificationAsRead,
     markAllNotificationsAsRead,
+    clearAllNotifications,  // ✅ Import clearAllNotifications
     clearNotifications,
     addToRecentlyViewed,
     isDarkMode,
@@ -137,7 +138,7 @@ function GlobalHeader({
 
   const totalCartItems = cart.reduce((s, i) => s + i.quantity, 0);
 
-  // ✅ Handle notification click
+  // Handle notification click
   const handleNotificationClick = async (notification) => {
     // Mark as read
     if (!notification.isRead) {
@@ -152,12 +153,7 @@ function GlobalHeader({
     setShowNotifications(false);
   };
 
-  // ✅ Handle mark all read
-  const handleMarkAllRead = async () => {
-    await markAllNotificationsAsRead();
-  };
-
-  // ✅ Format time ago
+  // Format time ago
   const timeAgo = (date) => {
     const diff = Date.now() - new Date(date).getTime();
     const mins = Math.floor(diff / 60000);
@@ -268,7 +264,7 @@ function GlobalHeader({
             )}
           </Link>
 
-          {/* ✅ NOTIFICATION BELL - Updated UI */}
+          {/* NOTIFICATION BELL */}
           <div className="notification-wrapper" ref={notificationRef}>
             <button 
               className="notification-bell"
@@ -363,8 +359,9 @@ function GlobalHeader({
                     <div style={{ display: 'flex', gap: '8px' }}>
                       {notifications.length > 0 && (
                         <>
+                          {/* ✅ Mark all read button */}
                           <button 
-                            onClick={handleMarkAllRead}
+                            onClick={markAllNotificationsAsRead}
                             style={{
                               background: 'none',
                               border: 'none',
@@ -379,24 +376,26 @@ function GlobalHeader({
                             onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(212, 175, 55, 0.08)'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                           >
-                            Mark all read
+                            ✅ Mark all read
                           </button>
+                          {/* ✅ Clear all button - actually deletes */}
                           <button 
-                            onClick={clearNotifications}
+                            onClick={clearAllNotifications}
                             style={{
                               background: 'none',
                               border: 'none',
-                              color: '#888',
+                              color: '#ff4444',
                               fontSize: '12px',
                               cursor: 'pointer',
                               padding: '4px 8px',
                               borderRadius: '6px',
-                              transition: 'all 0.3s ease'
+                              transition: 'all 0.3s ease',
+                              fontWeight: '500'
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 68, 68, 0.05)'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                           >
-                            Clear all
+                            🗑️ Clear all
                           </button>
                         </>
                       )}
