@@ -12,8 +12,8 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
   const [format, setFormat] = useState('thermal-4x6');
   const [generatedLabel, setGeneratedLabel] = useState(null);
   const [error, setError] = useState('');
-  const [downloadStarted, setDownloadStarted] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [trackingNumber, setTrackingNumber] = useState('');
 
   const couriers = [
     { value: 'delhivery', label: 'Delhivery' },
@@ -25,134 +25,93 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
   ];
 
   const formats = [
-    { value: 'thermal-4x6', label: 'Thermal (4×6")', icon: '🖨️' },
-    { value: 'a4', label: 'A4 Sheet', icon: '📄' },
-    { value: 'a5', label: 'A5 Label', icon: '📄' }
+    { value: 'thermal-4x6', label: 'Thermal (4×6")', icon: '🖨️', desc: 'Standard shipping label' },
+    { value: 'a4', label: 'A4 Sheet', icon: '📄', desc: 'Full page A4' },
+    { value: 'a5', label: 'A5 Sheet', icon: '📄', desc: 'Half page' }
   ];
 
-  // Auto-download when label is generated
-  useEffect(() => {
-    if (generatedLabel && !downloadStarted) {
-      console.log('📦 Auto-download triggered!');
-      console.log('📦 Download URL:', generatedLabel.downloadUrl);
-      console.log('📦 Tracking Number:', generatedLabel.trackingNumber);
-      
-      setDownloadStarted(true);
-      
-      const timer = setTimeout(() => {
-        handleDownload();
-      }, 1500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [generatedLabel]);
-
-  // ✅ DOWNLOAD FUNCTION - Fixed
-  const handleDownload = () => {
-    if (!generatedLabel?.downloadUrl) {
-      console.error('❌ No download URL available');
-      setError('No download URL available. Please try again.');
-      return;
-    }
-
-    const token = localStorage.getItem('loop_token');
-    
-    // ✅ Pass token as URL parameter
-    const downloadUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${encodeURIComponent(token)}`;
-    
-    console.log('📥 Downloading from:', downloadUrl);
-    
-    // ✅ Use fetch to download with token
-    fetch(downloadUrl)
-      .then(response => {
-        console.log('📥 Response status:', response.status);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        return response.blob();
-      })
-      .then(blob => {
-        console.log('📥 File size:', blob.size, 'bytes');
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = generatedLabel.downloadUrl.split('/').pop() || 'shipping-label.pdf';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        setDownloadSuccess(true);
-        console.log('✅ Download complete!');
-      })
-      .catch(err => {
-        console.error('❌ Download failed:', err);
-        setError('Download failed: ' + err.message);
-      });
-  };
-
-  // ✅ PRINT FUNCTION - Opens in new tab for preview
-  const handlePrint = () => {
-    if (!generatedLabel?.downloadUrl) {
-      alert('No label to print. Please generate one first.');
-      return;
-    }
-    
-    const token = localStorage.getItem('loop_token');
-    
-    // ✅ Pass token as URL parameter
-    const printUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${encodeURIComponent(token)}`;
-    
-    console.log('🖨️ Opening print preview:', printUrl);
-    
-    const printWindow = window.open(printUrl, '_blank');
-    
-    if (printWindow) {
-      console.log('✅ Preview tab opened');
-      // ✅ Show instruction alert
-      setTimeout(() => {
-        alert('📄 Label opened in new tab.\nUse Ctrl+P (Windows) or Cmd+P (Mac) to print.\nClose the tab when done.');
-      }, 500);
-    } else {
-      alert('Please allow popups to view the label.');
-    }
-  };
-
+  // ✅ GENERATE AND DOWNLOAD LABEL
   const handleGenerate = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setDownloadStarted(false);
     setDownloadSuccess(false);
 
     try {
       const token = localStorage.getItem('loop_token');
       console.log('📦 Generating label for order:', order._id);
       console.log('📦 Format:', format);
+      console.log('📦 Courier:', courier);
       
       const response = await axios.post(
         `${API_URL}/api/labels/generate/${order._id}`,
-        { courier, courierName, instructions, format },
         { 
-          headers: { Authorization: `Bearer ${token}` },
+          courier, 
+          courierName, 
+          instructions, 
+          format 
+        },
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Accept': 'application/pdf'
+          },
+          responseType: 'blob', // ✅ Important: Get PDF as blob
           timeout: 30000
         }
       );
 
-      console.log('✅ Label response:', response.data);
-
-      if (response.data.success) {
-        setGeneratedLabel(response.data);
-        if (onLabelGenerated) {
-          onLabelGenerated(response.data);
+      console.log('✅ Label generated, file size:', response.data.size, 'bytes');
+      
+      // ✅ Extract tracking number from response headers or filename
+      const contentDisposition = response.headers['content-disposition'];
+      let tracking = 'Generated';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename=label-(.+)\.pdf/);
+        if (match) {
+          tracking = match[1];
         }
-      } else {
-        setError(response.data?.error || 'Failed to generate label');
       }
+      setTrackingNumber(tracking);
+      
+      // ✅ Download directly from response
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `label-${order.orderId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      setDownloadSuccess(true);
+      setGeneratedLabel({ 
+        trackingNumber: tracking,
+        downloadUrl: url 
+      });
+      
+      if (onLabelGenerated) {
+        onLabelGenerated({ success: true, trackingNumber: tracking });
+      }
+      
     } catch (err) {
       console.error('❌ Label generation error:', err);
       
-      if (err.response) {
-        setError(`Server error (${err.response.status}): ${err.response.data?.error || err.message}`);
+      // Try to parse error response
+      if (err.response && err.response.data) {
+        // Check if it's a blob error
+        if (err.response.data instanceof Blob) {
+          const text = await err.response.data.text();
+          try {
+            const json = JSON.parse(text);
+            setError(json.error || 'Failed to generate label');
+          } catch {
+            setError('Failed to generate label. Please try again.');
+          }
+        } else {
+          setError(err.response.data?.error || 'Failed to generate label');
+        }
       } else if (err.request) {
         setError('No response from server. Please check your connection.');
       } else {
@@ -163,11 +122,49 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
     }
   };
 
+  // ✅ VIEW & PRINT - Opens in new tab
+  const handlePrint = async () => {
+    try {
+      const token = localStorage.getItem('loop_token');
+      const previewUrl = `${API_URL}/api/labels/preview/${order._id}?token=${encodeURIComponent(token)}`;
+      
+      console.log('🖨️ Opening preview:', previewUrl);
+      
+      const printWindow = window.open(previewUrl, '_blank');
+      
+      if (printWindow) {
+        console.log('✅ Preview tab opened');
+        setTimeout(() => {
+          alert('📄 Label opened in new tab.\n\n🖨️ Use Ctrl+P (Windows) or Cmd+P (Mac) to print.\n❌ Close the tab when done.');
+        }, 500);
+      } else {
+        alert('⚠️ Please allow popups to view the label.');
+      }
+    } catch (err) {
+      console.error('❌ Preview error:', err);
+      alert('Failed to open label preview. Please use the Download button instead.');
+    }
+  };
+
+  // ✅ DOWNLOAD AGAIN (if needed)
+  const handleDownloadAgain = () => {
+    if (generatedLabel?.downloadUrl) {
+      const link = document.createElement('a');
+      link.href = generatedLabel.downloadUrl;
+      link.download = `label-${order.orderId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert('No label to download. Please generate one first.');
+    }
+  };
+
   const resetModal = () => {
     setGeneratedLabel(null);
     setError('');
-    setDownloadStarted(false);
     setDownloadSuccess(false);
+    setTrackingNumber('');
     setLoading(false);
   };
 
@@ -193,12 +190,25 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
         </div>
 
         {!generatedLabel ? (
+          // 📝 GENERATE FORM
           <form onSubmit={handleGenerate} className="label-form">
             <div className="label-order-summary">
-              <span>Order: <strong>#{order.orderId}</strong></span>
-              <span>Customer: <strong>{order.customer?.name}</strong></span>
-              <span>Items: <strong>{order.items?.length}</strong></span>
-              <span>Total: <strong>₹{order.total}</strong></span>
+              <div className="summary-item">
+                <span className="summary-label">Order</span>
+                <span className="summary-value">#{order.orderId}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">Customer</span>
+                <span className="summary-value">{order.customer?.name || 'Guest'}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">Items</span>
+                <span className="summary-value">{order.items?.length || 0}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-label">Total</span>
+                <span className="summary-value">₹{order.total}</span>
+              </div>
             </div>
 
             <div className="form-group">
@@ -244,8 +254,9 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
                     className={`format-option ${format === f.value ? 'active' : ''}`}
                     onClick={() => setFormat(f.value)}
                   >
-                    <span>{f.icon}</span>
-                    {f.label}
+                    <span className="format-icon">{f.icon}</span>
+                    <span className="format-label">{f.label}</span>
+                    <span className="format-desc">{f.desc}</span>
                   </button>
                 ))}
               </div>
@@ -253,16 +264,10 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
 
             {error && (
               <div className="label-error">
-                ❌ {error}
+                <span>❌ {error}</span>
                 <button 
                   onClick={() => setError('')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#ff4444',
-                    cursor: 'pointer',
-                    marginLeft: '8px'
-                  }}
+                  className="error-close"
                 >
                   ✕
                 </button>
@@ -274,59 +279,60 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
                 Cancel
               </button>
               <button type="submit" className="btn-primary" disabled={loading}>
-                {loading ? '⏳ Generating...' : '📦 Generate Label'}
+                {loading ? (
+                  <>
+                    <span className="spinner-small"></span>
+                    Generating...
+                  </>
+                ) : (
+                  '📦 Generate & Download'
+                )}
               </button>
             </div>
           </form>
         ) : (
+          // ✅ SUCCESS VIEW
           <div className="label-generated">
-            <div className="label-success-icon">✅</div>
-            <h4>Label Generated Successfully!</h4>
+            <div className="success-icon">✅</div>
+            <h4>Label Generated & Downloaded!</h4>
             
-            <div style={{ margin: '12px 0' }}>
-              <p style={{ color: '#888', fontSize: '14px' }}>
-                Tracking Number: <strong style={{ color: '#D4AF37' }}>{generatedLabel.trackingNumber}</strong>
+            <div className="success-details">
+              <p>
+                <span className="detail-label">Tracking Number:</span>
+                <span className="detail-value">{trackingNumber || generatedLabel.trackingNumber}</span>
               </p>
-              {generatedLabel.downloadUrl && (
-                <p style={{ fontSize: '12px', color: '#666' }}>
-                  📄 {generatedLabel.downloadUrl.split('/').pop()}
-                </p>
-              )}
-              {downloadSuccess && (
-                <p style={{ color: '#28a745', fontSize: '13px', marginTop: '4px' }}>
-                  ✅ Download started!
-                </p>
-              )}
+              <p className="download-location">
+                💾 Saved to your <strong>Downloads</strong> folder
+              </p>
             </div>
             
-            <div className="label-preview-actions">
+            <div className="label-actions-success">
               <button 
                 className="btn-primary" 
                 onClick={handlePrint}
-                style={{ minWidth: '120px' }}
               >
                 🖨️ View & Print
               </button>
               <button 
                 className="btn-secondary" 
-                onClick={handleDownload}
-                style={{ minWidth: '120px' }}
+                onClick={handleDownloadAgain}
               >
-                📥 Download PDF
+                📥 Download Again
               </button>
               <button 
                 className="btn-secondary" 
                 onClick={resetModal}
-                style={{ minWidth: '120px' }}
               >
                 🔄 Generate New
               </button>
             </div>
 
             <div className="label-tip">
-              💡 <strong>Print:</strong> Opens in new tab for preview. Use browser print (Ctrl+P).
+              💡 <strong>Print:</strong> Opens in new tab. Use browser print (Ctrl+P).
               <br />
-              💡 <strong>Download:</strong> Saves PDF to your computer.
+              💡 <strong>Download:</strong> If download didn't start, click "Download Again".
+              <br />
+              💡 <strong>File saved as:</strong> <code>label-{order.orderId}.pdf</code>
             </div>
           </div>
         )}
@@ -339,8 +345,8 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(4px);
+          background: rgba(0, 0, 0, 0.8);
+          backdrop-filter: blur(6px);
           z-index: 10000;
           display: flex;
           align-items: center;
@@ -350,53 +356,89 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
 
         .label-modal {
           background: #111;
-          border-radius: 16px;
-          padding: 28px;
-          max-width: 520px;
+          border-radius: 20px;
+          padding: 30px;
+          max-width: 540px;
           width: 100%;
           max-height: 90vh;
           overflow-y: auto;
           border: 1px solid #333;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .label-modal::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .label-modal::-webkit-scrollbar-track {
+          background: #1a1a1a;
+          border-radius: 3px;
+        }
+
+        .label-modal::-webkit-scrollbar-thumb {
+          background: #D4AF37;
+          border-radius: 3px;
         }
 
         .label-modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 20px;
+          margin-bottom: 24px;
         }
 
         .label-modal-header h3 {
           color: #D4AF37;
           margin: 0;
+          font-size: 22px;
+          font-family: 'Nunito', sans-serif;
         }
 
         .label-modal-close {
           background: none;
           border: none;
           color: #888;
-          font-size: 24px;
+          font-size: 28px;
           cursor: pointer;
+          transition: all 0.3s ease;
+          padding: 4px 8px;
+          border-radius: 50%;
         }
 
         .label-modal-close:hover {
           color: #fff;
+          background: rgba(255, 255, 255, 0.05);
+          transform: rotate(90deg);
         }
 
         .label-order-summary {
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 8px;
-          padding: 12px 16px;
+          padding: 14px 16px;
           background: #1a1a1a;
-          border-radius: 8px;
-          margin-bottom: 16px;
-          font-size: 13px;
-          color: #888;
+          border-radius: 12px;
+          margin-bottom: 18px;
+          border: 1px solid #2a2a2a;
         }
 
-        .label-order-summary strong {
+        .summary-item {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .summary-label {
+          font-size: 10px;
+          color: #666;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .summary-value {
+          font-size: 14px;
           color: #fff;
+          font-weight: 600;
+          font-family: 'Nunito', sans-serif;
         }
 
         .form-group {
@@ -407,7 +449,8 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           display: block;
           color: #888;
           font-size: 13px;
-          margin-bottom: 4px;
+          font-weight: 500;
+          margin-bottom: 5px;
         }
 
         .form-group select,
@@ -416,61 +459,99 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           padding: 10px 14px;
           background: #222;
           border: 1px solid #333;
-          border-radius: 8px;
+          border-radius: 10px;
           color: #fff;
           font-size: 14px;
           outline: none;
+          transition: all 0.3s ease;
+          font-family: 'Nunito', sans-serif;
         }
 
         .form-group select:focus,
         .form-group input:focus {
           border-color: #D4AF37;
+          box-shadow: 0 0 20px rgba(212, 175, 55, 0.05);
+        }
+
+        .form-group select option {
+          background: #222;
+          color: #fff;
         }
 
         .format-options {
-          display: flex;
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
           gap: 8px;
         }
 
         .format-option {
           flex: 1;
-          padding: 10px;
+          padding: 12px 8px;
           border: 2px solid #333;
-          border-radius: 8px;
+          border-radius: 10px;
           background: transparent;
           color: #888;
           cursor: pointer;
-          transition: all 0.3s;
+          transition: all 0.3s ease;
           text-align: center;
-          font-size: 13px;
-        }
-
-        .format-option span {
-          display: block;
-          font-size: 20px;
-          margin-bottom: 4px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 2px;
+          font-family: 'Nunito', sans-serif;
         }
 
         .format-option:hover {
           border-color: #666;
+          transform: translateY(-2px);
         }
 
         .format-option.active {
           border-color: #D4AF37;
           color: #D4AF37;
           background: rgba(212, 175, 55, 0.05);
+          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.05);
+        }
+
+        .format-icon {
+          font-size: 24px;
+        }
+
+        .format-label {
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .format-desc {
+          font-size: 9px;
+          color: #666;
         }
 
         .label-error {
           color: #ff4444;
           font-size: 13px;
           margin-bottom: 12px;
-          padding: 8px 12px;
-          background: rgba(255, 68, 68, 0.1);
-          border-radius: 6px;
+          padding: 10px 14px;
+          background: rgba(255, 68, 68, 0.08);
+          border-radius: 8px;
+          border: 1px solid rgba(255, 68, 68, 0.1);
           display: flex;
           justify-content: space-between;
           align-items: center;
+        }
+
+        .error-close {
+          background: none;
+          border: none;
+          color: #ff4444;
+          cursor: pointer;
+          font-size: 16px;
+          padding: 0 4px;
+          opacity: 0.7;
+        }
+
+        .error-close:hover {
+          opacity: 1;
         }
 
         .label-actions {
@@ -479,15 +560,22 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           margin-top: 8px;
         }
 
-        .label-actions button {
+        .label-actions button,
+        .label-actions-success button {
           flex: 1;
-          padding: 12px;
-          border-radius: 8px;
+          padding: 12px 16px;
+          border-radius: 10px;
           font-weight: 600;
           cursor: pointer;
           font-size: 14px;
-          transition: all 0.3s;
+          transition: all 0.3s ease;
           border: none;
+          font-family: 'Nunito', sans-serif;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          min-height: 48px;
         }
 
         .btn-primary {
@@ -497,11 +585,13 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
 
         .btn-primary:hover:not(:disabled) {
           transform: scale(1.02);
+          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.2);
         }
 
         .btn-primary:disabled {
           opacity: 0.6;
           cursor: not-allowed;
+          transform: none;
         }
 
         .btn-secondary {
@@ -511,6 +601,22 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
 
         .btn-secondary:hover {
           background: #444;
+          transform: scale(1.02);
+        }
+
+        .spinner-small {
+          display: inline-block;
+          width: 16px;
+          height: 16px;
+          border: 2px solid rgba(0, 0, 0, 0.1);
+          border-top-color: #000;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+          margin-right: 6px;
+        }
+
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
 
         .label-generated {
@@ -518,79 +624,161 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           padding: 10px 0;
         }
 
-        .label-success-icon {
-          font-size: 48px;
+        .success-icon {
+          font-size: 52px;
           margin-bottom: 8px;
+          animation: bounceIn 0.5s ease;
+        }
+
+        @keyframes bounceIn {
+          0% { transform: scale(0); opacity: 0; }
+          50% { transform: scale(1.2); }
+          70% { transform: scale(0.9); }
+          100% { transform: scale(1); opacity: 1; }
         }
 
         .label-generated h4 {
           color: #28a745;
-          margin: 0 0 4px;
+          margin: 0 0 8px;
+          font-size: 20px;
+          font-family: 'Nunito', sans-serif;
         }
 
-        .label-generated p {
+        .success-details {
+          background: #1a1a1a;
+          border-radius: 10px;
+          padding: 14px;
+          margin: 12px 0 16px;
+          border: 1px solid #2a2a2a;
+        }
+
+        .success-details p {
+          margin: 4px 0;
           color: #888;
           font-size: 14px;
-          margin-bottom: 16px;
         }
 
-        .label-generated p strong {
+        .detail-label {
+          color: #666;
+          font-weight: 500;
+        }
+
+        .detail-value {
           color: #D4AF37;
+          font-weight: 600;
+          margin-left: 6px;
+          font-family: 'Courier New', monospace;
+          letter-spacing: 0.5px;
         }
 
-        .label-preview-actions {
+        .download-location {
+          color: #28a745 !important;
+          font-size: 13px !important;
+          margin-top: 6px !important;
+        }
+
+        .download-location strong {
+          color: #fff;
+        }
+
+        .label-actions-success {
           display: flex;
           gap: 10px;
           flex-wrap: wrap;
           justify-content: center;
-          margin-top: 8px;
+          margin-top: 4px;
         }
 
-        .label-preview-actions button {
-          padding: 10px 20px;
-          border-radius: 8px;
+        .label-actions-success button {
+          flex: 1;
+          min-width: 100px;
+          padding: 10px 16px;
+          border-radius: 10px;
           font-weight: 600;
           cursor: pointer;
-          font-size: 14px;
-          transition: all 0.3s;
+          font-size: 13px;
+          transition: all 0.3s ease;
           border: none;
-          min-width: 120px;
+          font-family: 'Nunito', sans-serif;
         }
 
         .label-tip {
           margin-top: 16px;
-          padding: 10px 14px;
+          padding: 12px 16px;
           background: rgba(212, 175, 55, 0.05);
-          border: 1px solid rgba(212, 175, 55, 0.1);
-          border-radius: 8px;
+          border: 1px solid rgba(212, 175, 55, 0.08);
+          border-radius: 10px;
           color: #888;
-          font-size: 13px;
-          line-height: 1.6;
+          font-size: 12px;
+          line-height: 1.8;
+          text-align: left;
         }
 
         .label-tip strong {
           color: #D4AF37;
         }
 
+        .label-tip code {
+          background: #1a1a1a;
+          padding: 2px 8px;
+          border-radius: 4px;
+          color: #D4AF37;
+          font-size: 11px;
+          font-family: 'Courier New', monospace;
+        }
+
         @media (max-width: 480px) {
           .label-modal {
             padding: 20px;
+            border-radius: 14px;
+            margin: 10px;
           }
-          
+
+          .label-modal-header h3 {
+            font-size: 18px;
+          }
+
           .label-order-summary {
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            padding: 10px 12px;
           }
-          
+
+          .summary-value {
+            font-size: 13px;
+          }
+
           .format-options {
-            flex-direction: column;
+            grid-template-columns: 1fr;
+            gap: 6px;
           }
-          
+
+          .format-option {
+            flex-direction: row;
+            padding: 8px 12px;
+            gap: 8px;
+            justify-content: flex-start;
+          }
+
+          .format-icon {
+            font-size: 18px;
+          }
+
           .label-actions {
             flex-direction: column;
           }
-          
-          .label-preview-actions {
+
+          .label-actions-success {
             flex-direction: column;
+          }
+
+          .label-actions-success button {
+            width: 100%;
+          }
+
+          .label-tip {
+            font-size: 11px;
+            padding: 10px 12px;
           }
         }
       `}</style>
