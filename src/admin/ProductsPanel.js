@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -24,6 +24,11 @@ function ProductsPanel() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
+  // ============================================
+  // SEARCH STATE
+  // ============================================
+  const [searchTerm, setSearchTerm] = useState('');
+  
   // Categories state
   const [allCategories, setAllCategories] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -31,7 +36,6 @@ function ProductsPanel() {
   
   // Category Filter state
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('');
-  const [filteredProducts, setFilteredProducts] = useState([]);
   
   // Variant states
   const [variantTypes, setVariantTypes] = useState([]);
@@ -46,6 +50,11 @@ function ProductsPanel() {
   const fileInputRef = useRef(null);
   const videoInputRef = useRef(null);
   
+  // ============================================
+  // FAQ STATE
+  // ============================================
+  const [faqs, setFaqs] = useState([]);
+  
   const [formData, setFormData] = useState({
     name: '',
     price: '',
@@ -57,24 +66,14 @@ function ProductsPanel() {
     mediaUrls: [''],
     description: '',
     hasVariants: false,
-    variants: []
+    variants: [],
+    faqs: []
   });
 
   useEffect(() => {
     fetchProducts();
     fetchCategories();
   }, []);
-
-  useEffect(() => {
-    if (selectedCategoryFilter) {
-      const filtered = products.filter(product => 
-        product.categories && product.categories.includes(selectedCategoryFilter)
-      );
-      setFilteredProducts(filtered);
-    } else {
-      setFilteredProducts(products);
-    }
-  }, [selectedCategoryFilter, products]);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -105,6 +104,51 @@ function ProductsPanel() {
     }
   };
 
+  // ============================================
+  // SEARCH FILTER
+  // ============================================
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    
+    if (selectedCategoryFilter) {
+      result = result.filter(product => 
+        product.categories && product.categories.includes(selectedCategoryFilter)
+      );
+    }
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase().trim();
+      result = result.filter(product =>
+        product.name?.toLowerCase().includes(term) ||
+        product.productId?.toLowerCase().includes(term) ||
+        product.description?.toLowerCase().includes(term) ||
+        product.category?.toLowerCase().includes(term)
+      );
+    }
+    
+    return result;
+  }, [products, selectedCategoryFilter, searchTerm]);
+
+  // ============================================
+  // FAQ FUNCTIONS
+  // ============================================
+  const addFaq = () => {
+    setFaqs([...faqs, { question: '', answer: '' }]);
+  };
+
+  const removeFaq = (index) => {
+    setFaqs(faqs.filter((_, i) => i !== index));
+  };
+
+  const updateFaq = (index, field, value) => {
+    const updated = [...faqs];
+    updated[index][field] = value;
+    setFaqs(updated);
+  };
+
+  // ============================================
+  // RESET FORM
+  // ============================================
   const resetForm = () => {
     setFormData({
       name: '',
@@ -117,8 +161,10 @@ function ProductsPanel() {
       mediaUrls: [''],
       description: '',
       hasVariants: false,
-      variants: []
+      variants: [],
+      faqs: []
     });
+    setFaqs([]);
     setSelectedCategories([]);
     setCategorySearch('');
     setVariantTypes([]);
@@ -128,12 +174,12 @@ function ProductsPanel() {
     setSuccess('');
     setUploadSuccess('');
     setUploadError('');
+    setSearchTerm('');
   };
 
   // ============================================
   // FILE UPLOAD HANDLERS
   // ============================================
-
   const handleFileSelect = async (files, type = 'image') => {
     if (!files || files.length === 0) return;
     
@@ -143,7 +189,6 @@ function ProductsPanel() {
     setUploadSuccess('');
 
     const formDataObj = new FormData();
-    const maxFiles = type === 'image' ? 10 : 1;
     const maxSize = type === 'image' ? 5 * 1024 * 1024 : 50 * 1024 * 1024;
     const validFiles = [];
 
@@ -272,9 +317,8 @@ function ProductsPanel() {
   };
 
   // ============================================
-  // Variant functions
+  // VARIANT FUNCTIONS
   // ============================================
-
   const addVariantType = () => {
     const type = prompt('Enter variant type (e.g., Size, Color, Engine):');
     if (type && type.trim()) {
@@ -311,9 +355,8 @@ function ProductsPanel() {
   };
 
   // ============================================
-  // Product CRUD operations
+  // PRODUCT CRUD OPERATIONS
   // ============================================
-
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this product? This action cannot be undone.')) return;
     try {
@@ -340,8 +383,6 @@ function ProductsPanel() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    console.log('🚀 Form submitted!');
-    
     setSaving(true);
     setError('');
     setSuccess('');
@@ -427,10 +468,9 @@ function ProductsPanel() {
         hasVariants: variantsData.length > 0,
         variants: variantsData,
         categories: selectedCategories,
+        faqs: faqs.filter(f => f.question.trim() && f.answer.trim()), // ✅ Save FAQs
         isActive: true
       };
-
-      console.log('📦 Sending product data:', data);
 
       const token = localStorage.getItem('loop_token');
       if (!token) {
@@ -441,24 +481,20 @@ function ProductsPanel() {
 
       let response;
       if (editingProduct) {
-        console.log('✏️ Updating product:', editingProduct._id);
         response = await axios.put(`${API_URL}/api/products/${editingProduct._id}`, data, {
           headers: { 
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
-        console.log('✅ Product updated:', response.data);
         setSuccess('✅ Product updated successfully!');
       } else {
-        console.log('➕ Creating new product...');
         response = await axios.post(`${API_URL}/api/products`, data, {
           headers: { 
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         });
-        console.log('✅ Product created:', response.data);
         setSuccess('✅ Product created successfully!');
       }
 
@@ -490,7 +526,6 @@ function ProductsPanel() {
       }
     } finally {
       setSaving(false);
-      console.log('🏁 Save operation completed');
     }
   };
 
@@ -511,8 +546,10 @@ function ProductsPanel() {
       mediaUrls: combinedMedia.length > 0 ? combinedMedia : [''],
       description: product.description || '',
       hasVariants: product.hasVariants || false,
-      variants: product.variants || []
+      variants: product.variants || [],
+      faqs: product.faqs || []
     });
+    setFaqs(product.faqs || []);
     setSelectedCategories(product.categories || []);
     
     // Load variants
@@ -603,7 +640,7 @@ function ProductsPanel() {
         background: '#0a0a0a',
         zIndex: 50
       }}>
-        <h2 style={{ color: '#fff' }}>👕 Products ({products.length})</h2>
+        <h2 style={{ color: '#fff' }}>👕 Products ({filteredProducts.length})</h2>
         <button 
           onClick={() => { 
             setShowForm(true); 
@@ -628,25 +665,48 @@ function ProductsPanel() {
         </button>
       </div>
 
-      {/* Category Filter */}
+      {/* Search & Filter Bar */}
       <div style={{
         display: 'flex',
-        alignItems: 'center',
         gap: '15px',
         padding: '15px 0',
         borderBottom: '1px solid #333',
         marginBottom: '15px',
-        flexWrap: 'wrap'
+        flexWrap: 'wrap',
+        alignItems: 'center'
       }}>
-        <label style={{ color: '#ccc', fontSize: '14px', fontWeight: '500' }}>
-          🔍 Filter:
-        </label>
+        <div style={{ flex: 1, minWidth: '200px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="🔍 Search by Name, Product ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              flex: 1,
+              padding: '10px',
+              background: '#222',
+              border: '1px solid #333',
+              color: 'white',
+              borderRadius: '6px',
+              fontSize: '14px',
+              outline: 'none'
+            }}
+          />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm('')} 
+              style={{ background: 'transparent', border: 'none', color: '#888', cursor: 'pointer', fontSize: '14px' }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
         
         <select
           value={selectedCategoryFilter}
           onChange={(e) => setSelectedCategoryFilter(e.target.value)}
           style={{
-            padding: '8px 16px',
+            padding: '10px',
             background: '#222',
             border: '1px solid #333',
             color: 'white',
@@ -665,32 +725,24 @@ function ProductsPanel() {
         </select>
 
         {selectedCategoryFilter && (
-          <>
-            <span style={{ 
-              color: '#888', 
+          <button
+            onClick={() => setSelectedCategoryFilter('')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#ff4444',
+              cursor: 'pointer',
               fontSize: '13px',
-              background: 'rgba(212, 175, 55, 0.1)',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              border: '1px solid rgba(212, 175, 55, 0.2)'
-            }}>
-              {filteredProducts.length} products
-            </span>
-            <button
-              onClick={() => setSelectedCategoryFilter('')}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#ff4444',
-                cursor: 'pointer',
-                fontSize: '13px',
-                padding: '4px 8px'
-              }}
-            >
-              ✕ Clear
-            </button>
-          </>
+              padding: '4px 8px'
+            }}
+          >
+            ✕ Clear
+          </button>
         )}
+        
+        <span style={{ color: '#666', fontSize: '13px' }}>
+          {filteredProducts.length} results
+        </span>
       </div>
 
       {/* Products Table */}
@@ -703,10 +755,8 @@ function ProductsPanel() {
           borderRadius: '8px'
         }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>👕</div>
-          <p style={{ fontSize: '16px', marginBottom: '8px' }}>No products yet.</p>
-          <p style={{ fontSize: '14px', color: '#666' }}>
-            Click the <strong style={{ color: '#D4AF37' }}>"➕ Add Product"</strong> button above to create your first product.
-          </p>
+          <p style={{ fontSize: '16px', marginBottom: '8px' }}>No products found.</p>
+          <p style={{ fontSize: '14px', color: '#666' }}>Try adjusting your search or filters.</p>
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
@@ -719,6 +769,7 @@ function ProductsPanel() {
                 <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>Categories</th>
                 <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>Price</th>
                 <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>Stock</th>
+                <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>FAQs</th>
                 <th style={{ textAlign: 'left', padding: '10px', borderBottom: '1px solid #333' }}>Actions</th>
               </tr>
             </thead>
@@ -759,6 +810,13 @@ function ProductsPanel() {
                   </td>
                   <td style={{ padding: '10px', borderBottom: '1px solid #222' }}>₹{product.price}</td>
                   <td style={{ padding: '10px', borderBottom: '1px solid #222' }}>{product.stock}</td>
+                  <td style={{ padding: '10px', borderBottom: '1px solid #222' }}>
+                    {product.faqs && product.faqs.length > 0 ? (
+                      <span style={{ color: '#D4AF37', fontSize: '12px' }}>✅ {product.faqs.length}</span>
+                    ) : (
+                      <span style={{ color: '#666', fontSize: '12px' }}>—</span>
+                    )}
+                  </td>
                   <td style={{ padding: '10px', borderBottom: '1px solid #222' }}>
                     <button 
                       onClick={() => window.open(`/product/${product.productId || product._id}`, '_blank')}
@@ -961,7 +1019,113 @@ function ProductsPanel() {
             </div>
 
             {/* ============================================ */}
-            {/* MEDIA SECTION - WITH FILE UPLOAD */}
+            {/* FAQ SECTION - NEW */}
+            {/* ============================================ */}
+            <div style={{ 
+              border: '1px solid #333', 
+              borderRadius: '8px', 
+              padding: '16px', 
+              marginBottom: '15px',
+              background: '#1a1a1a'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <label style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 'bold' }}>
+                  ❓ Frequently Asked Questions
+                </label>
+                <button
+                  type="button"
+                  onClick={addFaq}
+                  style={{
+                    background: '#D4AF37',
+                    border: 'none',
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    color: '#000'
+                  }}
+                >
+                  + Add FAQ
+                </button>
+              </div>
+
+              {faqs.length === 0 ? (
+                <p style={{ color: '#666', fontSize: '13px' }}>
+                  No FAQs added. Click "Add FAQ" to add questions about this product.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {faqs.map((faq, index) => (
+                    <div key={index} style={{ 
+                      background: '#222', 
+                      borderRadius: '6px', 
+                      padding: '12px', 
+                      border: '1px solid #333'
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ color: '#D4AF37', fontSize: '13px', fontWeight: '600' }}>
+                          FAQ #{index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeFaq(index)}
+                          style={{
+                            background: '#ff4444',
+                            border: 'none',
+                            padding: '2px 10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            color: 'white',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Question"
+                        value={faq.question}
+                        onChange={(e) => updateFaq(index, 'question', e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          marginBottom: '8px',
+                          background: '#1a1a1a',
+                          border: '1px solid #333',
+                          color: 'white',
+                          borderRadius: '4px',
+                          fontSize: '13px'
+                        }}
+                      />
+                      <textarea
+                        placeholder="Answer"
+                        value={faq.answer}
+                        onChange={(e) => updateFaq(index, 'answer', e.target.value)}
+                        rows="2"
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          background: '#1a1a1a',
+                          border: '1px solid #333',
+                          color: 'white',
+                          borderRadius: '4px',
+                          fontSize: '13px',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p style={{ color: '#666', fontSize: '12px', marginTop: '12px' }}>
+                💡 FAQs will appear on the product page below the description.
+              </p>
+            </div>
+
+            {/* ============================================ */}
+            {/* MEDIA SECTION - With File Upload */}
             {/* ============================================ */}
             <div style={{ 
               border: '1px solid #333', 

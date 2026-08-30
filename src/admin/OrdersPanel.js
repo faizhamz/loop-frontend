@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
@@ -70,6 +71,86 @@ function OrdersPanel() {
     }
   };
 
+  // ============================================
+  // SEARCH FUNCTIONALITY
+  // ============================================
+  const filteredOrders = useMemo(() => {
+    let result = orders;
+    
+    if (statusFilter !== 'all') {
+      result = result.filter(order => order.status === statusFilter);
+    }
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase().trim();
+      result = result.filter(order => 
+        order.orderId?.toLowerCase().includes(term) ||
+        order.customer?.name?.toLowerCase().includes(term) ||
+        order.customer?.email?.toLowerCase().includes(term) ||
+        order.customer?.phone?.includes(term) ||
+        order.customer?.address?.city?.toLowerCase().includes(term) ||
+        order.items?.some(item => item.name?.toLowerCase().includes(term))
+      );
+    }
+    
+    return result;
+  }, [orders, statusFilter, searchTerm]);
+
+  // ============================================
+  // EXPORT FUNCTIONALITY
+  // ============================================
+  const exportCSV = () => {
+    const headers = ['Order ID', 'Date', 'Customer', 'Email', 'Phone', 'Items', 'Total', 'Status', 'Payment Status'];
+    const rows = filteredOrders.map(order => [
+      order.orderId || 'N/A',
+      new Date(order.createdAt).toLocaleDateString(),
+      order.customer?.name || 'Guest',
+      order.customer?.email || 'N/A',
+      order.customer?.phone || 'N/A',
+      order.items?.length || 0,
+      order.total || 0,
+      order.status || 'pending',
+      order.paymentStatus || 'pending'
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `orders-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const exportExcel = () => {
+    const data = filteredOrders.map(order => ({
+      'Order ID': order.orderId || 'N/A',
+      'Date': new Date(order.createdAt).toLocaleDateString(),
+      'Customer': order.customer?.name || 'Guest',
+      'Email': order.customer?.email || 'N/A',
+      'Phone': order.customer?.phone || 'N/A',
+      'Items': order.items?.length || 0,
+      'Total': order.total || 0,
+      'Status': order.status || 'pending',
+      'Payment Status': order.paymentStatus || 'pending'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+    XLSX.writeFile(wb, `orders-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  // ============================================
+  // REST OF THE COMPONENT
+  // ============================================
   const updateStatus = async (id, newStatus) => {
     try {
       const token = localStorage.getItem('loop_token');
@@ -221,20 +302,6 @@ function OrdersPanel() {
     }).format(amount || 0);
   };
 
-  const filteredOrders = orders.filter(order => {
-    if (statusFilter !== 'all' && order.status !== statusFilter) return false;
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      return (
-        (order.orderId || '').toLowerCase().includes(term) ||
-        (order.customer?.name || '').toLowerCase().includes(term) ||
-        (order.customer?.email || '').toLowerCase().includes(term) ||
-        (order.customer?.phone || '').includes(term)
-      );
-    }
-    return true;
-  });
-
   const statusCounts = orders.reduce((acc, order) => {
     const status = order.status || 'pending';
     acc[status] = (acc[status] || 0) + 1;
@@ -295,13 +362,45 @@ function OrdersPanel() {
         </div>
       </div>
 
-      {/* Header */}
+      {/* Header with Export */}
       <div className="orders-panel-header">
         <div className="header-left">
           <h2>📋 Orders Management</h2>
           <span className="order-count-badge">{orders.length} orders</span>
         </div>
         <div className="header-right">
+          <button
+            onClick={exportCSV}
+            className="export-btn"
+            style={{
+              padding: '8px 16px',
+              background: '#28a745',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              marginRight: '8px'
+            }}
+          >
+            📄 CSV
+          </button>
+          <button
+            onClick={exportExcel}
+            className="export-btn"
+            style={{
+              padding: '8px 16px',
+              background: '#0066FF',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              marginRight: '8px'
+            }}
+          >
+            📊 Excel
+          </button>
           {cleanupStats?.expiredPendingOrders > 0 && (
             <span className="cleanup-warning-badge">
               ⚠️ {cleanupStats.expiredPendingOrders} pending
@@ -317,7 +416,7 @@ function OrdersPanel() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters with Search */}
       <div className="orders-filters">
         <div className="filter-tabs">
           <button
@@ -337,14 +436,41 @@ function OrdersPanel() {
             </button>
           ))}
         </div>
-        <div className="search-wrapper">
+        <div className="search-wrapper" style={{ display: 'flex', gap: '10px', flex: 1 }}>
           <input
             type="text"
-            placeholder="🔍 Search orders..."
+            placeholder="🔍 Search by Order ID, Customer, Email, Phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
+            style={{
+              flex: 1,
+              padding: '8px 14px',
+              background: '#222',
+              border: '1px solid #333',
+              borderRadius: '6px',
+              color: '#fff',
+              fontSize: '13px',
+              outline: 'none'
+            }}
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              style={{
+                padding: '8px 12px',
+                background: 'transparent',
+                border: 'none',
+                color: '#888',
+                cursor: 'pointer'
+              }}
+            >
+              ✕
+            </button>
+          )}
+          <span style={{ color: '#666', fontSize: '12px', alignSelf: 'center' }}>
+            {filteredOrders.length} results
+          </span>
         </div>
       </div>
 
@@ -584,7 +710,7 @@ function OrdersPanel() {
         </table>
       </div>
 
-      {/* ===== ORDER DETAILS MODAL ===== */}
+      {/* Order Details Modal */}
       {showOrderDetailsModal && selectedOrderForDetails && (
         <div className="modal-overlay" onClick={() => setShowOrderDetailsModal(false)}>
           <div className="order-details-modal" onClick={(e) => e.stopPropagation()}>
