@@ -56,14 +56,14 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
             Authorization: `Bearer ${token}`,
             'Accept': 'application/pdf'
           },
-          responseType: 'blob', // ✅ Important: Get PDF as blob
+          responseType: 'blob',
           timeout: 30000
         }
       );
 
       console.log('✅ Label generated, file size:', response.data.size, 'bytes');
       
-      // ✅ Extract tracking number from response headers or filename
+      // Extract tracking number from response headers or filename
       const contentDisposition = response.headers['content-disposition'];
       let tracking = 'Generated';
       if (contentDisposition) {
@@ -74,7 +74,7 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
       }
       setTrackingNumber(tracking);
       
-      // ✅ Download directly from response
+      // Download directly from response
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -98,9 +98,7 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
     } catch (err) {
       console.error('❌ Label generation error:', err);
       
-      // Try to parse error response
       if (err.response && err.response.data) {
-        // Check if it's a blob error
         if (err.response.data instanceof Blob) {
           const text = await err.response.data.text();
           try {
