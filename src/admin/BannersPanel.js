@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { motion } from 'framer-motion';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
@@ -11,8 +12,15 @@ function BannersPanel() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Upload states
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSuccess, setUploadSuccess] = useState('');
+  const [uploadError, setUploadError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
 
-  // ✅ FIX: Complete initial state
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -66,7 +74,102 @@ function BannersPanel() {
     }
   };
 
-  // ✅ FIX: Complete reset function
+  // ============================================
+  // FILE UPLOAD HANDLERS
+  // ============================================
+
+  const handleFileSelect = async (files) => {
+    if (!files || files.length === 0) return;
+    
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadError('');
+    setUploadSuccess('');
+
+    const formDataObj = new FormData();
+    const validFiles = [];
+
+    for (const file of files) {
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError(`File too large: ${file.name} (max 5MB)`);
+        continue;
+      }
+      if (!file.type.startsWith('image/')) {
+        setUploadError(`Invalid file type: ${file.name} (must be image)`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      setUploading(false);
+      return;
+    }
+
+    const bannerId = editingBanner?._id || `banner_${Date.now()}`;
+    const productId = bannerId;
+    
+    validFiles.forEach(file => {
+      formDataObj.append('images', file);
+    });
+    formDataObj.append('productId', productId);
+    formDataObj.append('folder', 'loop/banners');
+
+    try {
+      const token = localStorage.getItem('loop_token');
+      const response = await axios.post(`${API_URL}/api/upload/images`, formDataObj, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
+      });
+
+      const urls = response.data.images.map(img => img.urls.original);
+      const firstUrl = urls.length > 0 ? urls[0] : '';
+      
+      setFormData(prev => ({
+        ...prev,
+        image: firstUrl,
+        imageMobile: firstUrl // Also set mobile to same for now, user can change
+      }));
+      
+      setUploadSuccess(`✅ ${urls.length} image(s) uploaded successfully!`);
+      setTimeout(() => setUploadSuccess(''), 4000);
+    } catch (err) {
+      setUploadError(err.response?.data?.error || 'Upload failed');
+      setTimeout(() => setUploadError(''), 4000);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      handleFileSelect(files);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  // ============================================
+  // Banner CRUD Operations
+  // ============================================
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -85,6 +188,8 @@ function BannersPanel() {
     setEditingBanner(null);
     setError('');
     setSuccess('');
+    setUploadSuccess('');
+    setUploadError('');
   };
 
   const handleSave = async (e) => {
@@ -115,7 +220,7 @@ function BannersPanel() {
 
       fetchBanners();
       setShowForm(false);
-      resetForm(); // ✅ Reset after save
+      resetForm();
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
       console.error('Error saving banner:', error);
@@ -240,7 +345,7 @@ function BannersPanel() {
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>📸</div>
           <p style={{ fontSize: '16px', marginBottom: '8px' }}>No banners yet.</p>
           <p style={{ fontSize: '14px', color: '#666' }}>
-            Click the <strong style={{ color: '#D4AF37' }}>"➕ Add Banner"</strong> button above to create your first banner.
+            Click the <strong style={{ color: '#D4AF37', cursor: 'pointer' }}>"➕ Add Banner"</strong> button above to create your first banner.
           </p>
         </div>
       ) : (
@@ -300,7 +405,7 @@ function BannersPanel() {
                   </button>
                   <button 
                     onClick={() => handleToggle(banner._id, banner.isActive)} 
-                    style={{ marginRight: '5px', background: '#D4AF37', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer' }}
+                    style={{ marginRight: '5px', background: banner.isActive ? '#ff8800' : '#28a745', border: 'none', padding: '5px 12px', borderRadius: '4px', cursor: 'pointer', color: 'white' }}
                   >
                     {banner.isActive ? 'Disable' : 'Enable'}
                   </button>
@@ -346,26 +451,164 @@ function BannersPanel() {
               {editingBanner ? '✏️ Edit Banner' : '➕ Add New Banner'}
             </h3>
             
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ color: '#888', fontSize: '12px', display: 'block', marginBottom: '5px' }}>
-                📸 Banner Image URL *
+            {error && (
+              <div style={{ background: '#ff4444', color: 'white', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>
+                {error}
+              </div>
+            )}
+
+            {uploadError && (
+              <div style={{ background: '#ff4444', color: 'white', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>
+                ❌ {uploadError}
+              </div>
+            )}
+
+            {uploadSuccess && (
+              <div style={{ background: '#28a745', color: 'white', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>
+                {uploadSuccess}
+              </div>
+            )}
+
+            {/* ============================================ */}
+            {/* IMAGE UPLOAD SECTION */}
+            {/* ============================================ */}
+            <div style={{ 
+              border: '1px solid #333', 
+              borderRadius: '8px', 
+              padding: '16px', 
+              marginBottom: '15px',
+              background: '#1a1a1a'
+            }}>
+              <label style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 'bold', display: 'block', marginBottom: '12px' }}>
+                📸 Banner Image *
               </label>
+
+              {/* Hidden file input */}
+              <input
+                id="banner-file-upload-input"
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  if (e.target.files.length > 0) {
+                    handleFileSelect(e.target.files);
+                    e.target.value = '';
+                  }
+                }}
+              />
+
+              {/* Drag & Drop Zone */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                style={{
+                  border: `2px dashed ${isDragging ? '#D4AF37' : '#333'}`,
+                  borderRadius: '8px',
+                  padding: '20px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  background: isDragging ? 'rgba(212, 175, 55, 0.05)' : 'transparent',
+                  marginBottom: '12px'
+                }}
+                onClick={() => document.getElementById('banner-file-upload-input').click()}
+              >
+                <div style={{ fontSize: '32px' }}>📤</div>
+                <div style={{ color: '#888', fontSize: '14px' }}>
+                  {isDragging ? '⭐ Drop your image here!' : 'Drag & drop banner image or click to browse'}
+                </div>
+                <div style={{ color: '#666', fontSize: '12px' }}>
+                  JPG, PNG, WebP • Max 5MB • Recommended: 1200×600px
+                </div>
+              </div>
+
+              {/* Upload Progress */}
+              {uploading && (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{
+                    height: '4px',
+                    background: '#222',
+                    borderRadius: '2px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${uploadProgress}%`,
+                      background: 'linear-gradient(90deg, #D4AF37, #FFB7C5)',
+                      borderRadius: '2px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginTop: '4px', textAlign: 'center' }}>
+                    Uploading... {uploadProgress}%
+                  </div>
+                </div>
+              )}
+
+              {/* Image Preview */}
+              {formData.image && (
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ color: '#666', fontSize: '11px', marginBottom: '4px' }}>📋 Preview:</div>
+                  <div style={{
+                    position: 'relative',
+                    display: 'inline-block',
+                    borderRadius: '4px',
+                    overflow: 'hidden',
+                    border: '1px solid #333'
+                  }}>
+                    <img 
+                      src={formData.image} 
+                      alt="Banner preview" 
+                      style={{ 
+                        maxWidth: '100%', 
+                        maxHeight: '200px', 
+                        objectFit: 'contain',
+                        display: 'block'
+                      }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, image: '' })}
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        background: 'rgba(255, 68, 68, 0.9)',
+                        border: 'none',
+                        color: '#fff',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <p style={{ color: '#666', fontSize: '12px', marginTop: '12px' }}>
+                💡 Upload an image directly or enter a URL below
+              </p>
+
+              {/* URL Input (fallback) */}
               <input
                 type="text"
                 placeholder="https://example.com/banner-image.jpg"
                 value={formData.image}
                 onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                style={{ width: '100%', padding: '12px', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}
-                required
+                style={{ width: '100%', padding: '12px', marginTop: '8px', background: '#222', border: '1px solid #333', color: 'white', borderRadius: '6px' }}
               />
-              <p style={{ color: '#666', fontSize: '12px', marginTop: '4px' }}>
-                💡 Upload your banner image to ImgBB, ImageKit, or any image hosting service.
-              </p>
-              {formData.image && (
-                <div style={{ marginTop: '8px' }}>
-                  <img src={formData.image} alt="Preview" style={{ maxWidth: '100%', maxHeight: '150px', objectFit: 'contain', borderRadius: '4px', border: '1px solid #333' }} />
-                </div>
-              )}
             </div>
 
             <div style={{ marginBottom: '15px' }}>
