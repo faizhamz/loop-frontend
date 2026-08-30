@@ -13,18 +13,7 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
   const [generatedLabel, setGeneratedLabel] = useState(null);
   const [error, setError] = useState('');
   const [downloadStarted, setDownloadStarted] = useState(false);
-
-  // ✅ Auto-download when label is generated
-  useEffect(() => {
-    if (generatedLabel && !downloadStarted) {
-      console.log('📦 Auto-downloading label...');
-      setDownloadStarted(true);
-      const timer = setTimeout(() => {
-        handleDownload();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [generatedLabel]);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   const couriers = [
     { value: 'delhivery', label: 'Delhivery' },
@@ -41,15 +30,95 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
     { value: 'a5', label: 'A5 Label', icon: '📄' }
   ];
 
+  // Auto-download when label is generated
+  useEffect(() => {
+    if (generatedLabel && !downloadStarted) {
+      console.log('📦 Auto-download triggered!');
+      console.log('📦 Download URL:', generatedLabel.downloadUrl);
+      console.log('📦 Tracking Number:', generatedLabel.trackingNumber);
+      
+      setDownloadStarted(true);
+      
+      const timer = setTimeout(() => {
+        handleDownload();
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [generatedLabel]);
+
+  // ✅ DOWNLOAD FUNCTION
+  const handleDownload = () => {
+    if (!generatedLabel?.downloadUrl) {
+      console.error('❌ No download URL available');
+      setError('No download URL available. Please try again.');
+      return;
+    }
+
+    const token = localStorage.getItem('loop_token');
+    const downloadUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${token}`;
+    
+    console.log('📥 Attempting download from:', downloadUrl);
+    
+    try {
+      const win = window.open(downloadUrl, '_blank');
+      
+      if (win) {
+        console.log('✅ Download window opened');
+        setDownloadSuccess(true);
+      } else {
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.target = '_blank';
+        link.download = generatedLabel.downloadUrl.split('/').pop() || 'shipping-label.pdf';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setDownloadSuccess(true);
+      }
+    } catch (err) {
+      console.error('❌ Download failed:', err);
+      setError('Download failed. Please try again.');
+    }
+  };
+
+  // ✅ PRINT FUNCTION - PREVIEW MODE (No auto-print)
+  const handlePrint = () => {
+    if (!generatedLabel?.downloadUrl) {
+      alert('No label to print. Please generate one first.');
+      return;
+    }
+    
+    const token = localStorage.getItem('loop_token');
+    const printUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${token}`;
+    
+    // ✅ Open in new tab - shows preview
+    const printWindow = window.open(printUrl, '_blank');
+    
+    if (printWindow) {
+      // ✅ Show preview only - user prints manually with Ctrl+P
+      console.log('🖨️ Label preview opened in new tab');
+      
+      // Optional: Show a small notification
+      setTimeout(() => {
+        alert('📄 Label opened in new tab.\nUse Ctrl+P (Windows) or Cmd+P (Mac) to print.\nClose the tab when done.');
+      }, 500);
+    } else {
+      alert('Please allow popups to view the label.');
+    }
+  };
+
   const handleGenerate = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     setDownloadStarted(false);
+    setDownloadSuccess(false);
 
     try {
       const token = localStorage.getItem('loop_token');
       console.log('📦 Generating label for order:', order._id);
+      console.log('📦 Format:', format);
       
       const response = await axios.post(
         `${API_URL}/api/labels/generate/${order._id}`,
@@ -64,7 +133,9 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
 
       if (response.data.success) {
         setGeneratedLabel(response.data);
-        if (onLabelGenerated) onLabelGenerated(response.data);
+        if (onLabelGenerated) {
+          onLabelGenerated(response.data);
+        }
       } else {
         setError(response.data?.error || 'Failed to generate label');
       }
@@ -83,42 +154,11 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
     }
   };
 
-  const handleDownload = () => {
-    if (generatedLabel?.downloadUrl) {
-      const token = localStorage.getItem('loop_token');
-      const downloadUrl = `${API_URL}${generatedLabel.downloadUrl}?token=${token}`;
-      console.log('📥 Downloading from:', downloadUrl);
-      
-      // Open in new tab for download
-      const win = window.open(downloadUrl, '_blank');
-      if (!win) {
-        // If popup blocked, use direct download
-        window.location.href = downloadUrl;
-      }
-    } else {
-      console.warn('⚠️ No download URL available');
-    }
-  };
-
-  const handlePrint = () => {
-    if (generatedLabel?.downloadUrl) {
-      const token = localStorage.getItem('loop_token');
-      const printWindow = window.open(
-        `${API_URL}${generatedLabel.downloadUrl}?token=${token}`,
-        '_blank'
-      );
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print();
-        };
-      }
-    }
-  };
-
   const resetModal = () => {
     setGeneratedLabel(null);
     setError('');
     setDownloadStarted(false);
+    setDownloadSuccess(false);
     setLoading(false);
   };
 
@@ -233,34 +273,51 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           <div className="label-generated">
             <div className="label-success-icon">✅</div>
             <h4>Label Generated Successfully!</h4>
-            <p>
-              Tracking Number: <strong>{generatedLabel.trackingNumber}</strong>
-            </p>
-            {generatedLabel.downloadUrl && (
-              <p style={{ fontSize: '12px', color: '#666' }}>
-                📄 {generatedLabel.downloadUrl.split('/').pop()}
+            
+            <div style={{ margin: '12px 0' }}>
+              <p style={{ color: '#888', fontSize: '14px' }}>
+                Tracking Number: <strong style={{ color: '#D4AF37' }}>{generatedLabel.trackingNumber}</strong>
               </p>
-            )}
+              {generatedLabel.downloadUrl && (
+                <p style={{ fontSize: '12px', color: '#666' }}>
+                  📄 {generatedLabel.downloadUrl.split('/').pop()}
+                </p>
+              )}
+              {downloadSuccess && (
+                <p style={{ color: '#28a745', fontSize: '13px', marginTop: '4px' }}>
+                  ✅ Download started!
+                </p>
+              )}
+            </div>
             
             <div className="label-preview-actions">
-              <button className="btn-primary" onClick={handlePrint}>
-                🖨️ Print Label
+              <button 
+                className="btn-primary" 
+                onClick={handlePrint}
+                style={{ minWidth: '120px' }}
+              >
+                🖨️ View & Print
               </button>
-              <button className="btn-secondary" onClick={handleDownload}>
+              <button 
+                className="btn-secondary" 
+                onClick={handleDownload}
+                style={{ minWidth: '120px' }}
+              >
                 📥 Download PDF
               </button>
-              <button className="btn-secondary" onClick={resetModal}>
+              <button 
+                className="btn-secondary" 
+                onClick={resetModal}
+                style={{ minWidth: '120px' }}
+              >
                 🔄 Generate New
               </button>
             </div>
 
             <div className="label-tip">
-              💡 Label saved as <strong>{generatedLabel.downloadUrl?.split('/').pop() || 'label.pdf'}</strong>
-              {!downloadStarted && (
-                <span style={{ display: 'block', marginTop: '4px', color: '#D4AF37' }}>
-                  ⏳ Download will start automatically...
-                </span>
-              )}
+              💡 <strong>Print:</strong> Opens in new tab for preview. Use browser print (Ctrl+P).
+              <br />
+              💡 <strong>Download:</strong> Saves PDF to your computer.
             </div>
           </div>
         )}
@@ -499,6 +556,7 @@ function ShippingLabelModal({ isOpen, onClose, order, onLabelGenerated }) {
           border-radius: 8px;
           color: #888;
           font-size: 13px;
+          line-height: 1.6;
         }
 
         .label-tip strong {
