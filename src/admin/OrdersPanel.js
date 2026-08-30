@@ -21,12 +21,26 @@ function OrdersPanel() {
   const [cleanupStats, setCleanupStats] = useState(null);
   const [cleaning, setCleaning] = useState(false);
 
-  // ============================================
-  // ✅ NEW: Shipping Label Modal State
-  // ============================================
+  // Shipping Label Modal State
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [selectedOrderForLabel, setSelectedOrderForLabel] = useState(null);
   const [labelGenerating, setLabelGenerating] = useState(false);
+
+  // ============================================
+  // ✅ NEW: Print Options State
+  // ============================================
+  const [showPrintOptions, setShowPrintOptions] = useState(false);
+  const [printOrder, setPrintOrder] = useState(null);
+  const [printFormat, setPrintFormat] = useState('thermal-4x6');
+  const [printCopies, setPrintCopies] = useState(1);
+  const [printIncludeItems, setPrintIncludeItems] = useState(true);
+
+  const printFormats = [
+    { value: 'thermal-4x6', label: 'Thermal (4×6")', icon: '🖨️', description: 'Standard shipping label size' },
+    { value: 'a4', label: 'A4 Sheet', icon: '📄', description: 'Full page A4 (210×297mm)' },
+    { value: 'a5', label: 'A5 Sheet', icon: '📄', description: 'Half page A5 (148×210mm)' },
+    { value: 'label-4x4', label: 'Square Label (4×4")', icon: '🏷️', description: 'Small square label' }
+  ];
 
   useEffect(() => {
     fetchOrders();
@@ -81,28 +95,140 @@ function OrdersPanel() {
   };
 
   // ============================================
-  // ✅ NEW: Open Shipping Label Modal
+  // ✅ NEW: Print Label with Format Options
   // ============================================
+  const openPrintOptions = (order) => {
+    setPrintOrder(order);
+    setShowPrintOptions(true);
+  };
+
+  const handlePrintLabel = async () => {
+    if (!printOrder) return;
+
+    try {
+      const token = localStorage.getItem('loop_token');
+      
+      // First check if label exists
+      const checkResponse = await axios.get(
+        `${API_URL}/api/labels/order/${printOrder._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      let downloadUrl = checkResponse.data.downloadUrl;
+      
+      // If label doesn't exist, generate it first
+      if (!downloadUrl) {
+        setLabelGenerating(true);
+        const generateResponse = await axios.post(
+          `${API_URL}/api/labels/generate/${printOrder._id}`,
+          { 
+            courier: 'delhivery',
+            courierName: 'Delhivery',
+            format: printFormat,
+            instructions: ''
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (generateResponse.data.success) {
+          downloadUrl = generateResponse.data.downloadUrl;
+        } else {
+          alert('Failed to generate label');
+          setLabelGenerating(false);
+          return;
+        }
+        setLabelGenerating(false);
+      }
+
+      // Open print window with format parameter
+      const printWindow = window.open(
+        `${API_URL}${downloadUrl}?token=${token}&format=${printFormat}&copies=${printCopies}`,
+        '_blank'
+      );
+      
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+          }, 500);
+        };
+      }
+      
+      setShowPrintOptions(false);
+      setPrintOrder(null);
+      
+    } catch (err) {
+      console.error('Print label error:', err);
+      if (err.response?.status === 404) {
+        if (window.confirm('No shipping label found. Would you like to generate one now?')) {
+          openLabelModal(printOrder);
+        }
+      } else {
+        alert('Failed to print label: ' + (err.response?.data?.error || err.message));
+      }
+    } finally {
+      setLabelGenerating(false);
+    }
+  };
+
+  // ============================================
+  // ✅ NEW: Bulk Print Labels
+  // ============================================
+  const handleBulkPrint = async () => {
+    const shippedOrders = orders.filter(o => o.tracking?.number);
+    if (shippedOrders.length === 0) {
+      alert('No orders with shipping labels found.');
+      return;
+    }
+    
+    if (!window.confirm(`Print labels for ${shippedOrders.length} orders?`)) return;
+    
+    const token = localStorage.getItem('loop_token');
+    let printed = 0;
+    
+    for (const order of shippedOrders) {
+      try {
+        const response = await axios.get(
+          `${API_URL}/api/labels/order/${order._id}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        
+        if (response.data.downloadUrl) {
+          const printWindow = window.open(
+            `${API_URL}${response.data.downloadUrl}?token=${token}`,
+            '_blank'
+          );
+          if (printWindow) {
+            printWindow.onload = () => {
+              setTimeout(() => {
+                printWindow.print();
+              }, 500);
+            };
+          }
+          printed++;
+          // Small delay between prints
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      } catch (err) {
+        console.error('Failed to print order:', order.orderId, err);
+      }
+    }
+    
+    alert(`✅ Printed ${printed} labels`);
+  };
+
   const openLabelModal = (order) => {
     setSelectedOrderForLabel(order);
     setShowLabelModal(true);
   };
 
-  // ============================================
-  // ✅ NEW: Handle Label Generated
-  // ============================================
-const handleLabelGenerated = (labelData) => {
-  console.log('✅ Label generated:', labelData);
-  
-  // ✅ Show success toast or alert
-  alert(`✅ Shipping label generated!\nTracking: ${labelData.trackingNumber}\nDownload will start automatically.`);
-  
-  // Refresh orders
-  fetchOrders();
-};
+  const handleLabelGenerated = (labelData) => {
+    console.log('✅ Label generated:', labelData);
+    fetchOrders();
+  };
 
   // ============================================
-  // SEARCH FUNCTIONALITY
+  // SEARCH & FILTER
   // ============================================
   const filteredOrders = useMemo(() => {
     let result = orders;
@@ -127,7 +253,7 @@ const handleLabelGenerated = (labelData) => {
   }, [orders, statusFilter, searchTerm]);
 
   // ============================================
-  // EXPORT FUNCTIONALITY
+  // EXPORT
   // ============================================
   const exportCSV = () => {
     const headers = ['Order ID', 'Date', 'Customer', 'Email', 'Phone', 'Items', 'Total', 'Status', 'Payment Status'];
@@ -179,7 +305,7 @@ const handleLabelGenerated = (labelData) => {
   };
 
   // ============================================
-  // REST OF THE COMPONENT
+  // ORDER OPERATIONS
   // ============================================
   const updateStatus = async (id, newStatus) => {
     try {
@@ -279,6 +405,9 @@ const handleLabelGenerated = (labelData) => {
     }
   };
 
+  // ============================================
+  // HELPERS
+  // ============================================
   const getStatusColor = (status) => {
     const colors = {
       'pending': '#ff8800',
@@ -431,6 +560,23 @@ const handleLabelGenerated = (labelData) => {
           >
             📊 Excel
           </button>
+          {/* ✅ Bulk Print Button */}
+          <button
+            onClick={handleBulkPrint}
+            className="export-btn"
+            style={{
+              padding: '8px 16px',
+              background: '#8B5CF6',
+              border: 'none',
+              borderRadius: '6px',
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              marginRight: '8px'
+            }}
+          >
+            🖨️ Bulk Print
+          </button>
           {cleanupStats?.expiredPendingOrders > 0 && (
             <span className="cleanup-warning-badge">
               ⚠️ {cleanupStats.expiredPendingOrders} pending
@@ -446,7 +592,7 @@ const handleLabelGenerated = (labelData) => {
         </div>
       </div>
 
-      {/* Filters with Search */}
+      {/* Filters */}
       <div className="orders-filters">
         <div className="filter-tabs">
           <button
@@ -581,7 +727,7 @@ const handleLabelGenerated = (labelData) => {
                     </td>
                     <td>
                       <div className="action-buttons">
-                        {/* ✅ View Details Button */}
+                        {/* View Details */}
                         <button
                           onClick={() => viewOrderDetails(order)}
                           className="action-btn view-btn"
@@ -590,7 +736,7 @@ const handleLabelGenerated = (labelData) => {
                           📋
                         </button>
                         
-                        {/* ✅ Invoice Button */}
+                        {/* Invoice */}
                         <button
                           onClick={() => downloadInvoice(order._id)}
                           className="action-btn invoice-btn"
@@ -599,32 +745,58 @@ const handleLabelGenerated = (labelData) => {
                           📄
                         </button>
                         
-                        {/* ✅ Shipping Label Button - NEW */}
-                        <button
-                          onClick={() => openLabelModal(order)}
-                          className="action-btn label-btn"
-                          title="Generate Shipping Label"
-                          style={{
-                            background: 'rgba(212, 175, 55, 0.15)',
-                            color: '#D4AF37',
-                            border: 'none',
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '14px',
-                            transition: 'all 0.3s ease'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.25)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
-                          }}
-                        >
-                          📦
-                        </button>
+                        {/* ✅ NEW: Print Label with Options */}
+                        {order.tracking?.number ? (
+                          <button
+                            onClick={() => openPrintOptions(order)}
+                            className="action-btn print-btn"
+                            title="🖨️ Print Shipping Label"
+                            style={{
+                              background: 'rgba(40, 167, 69, 0.15)',
+                              color: '#28a745',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(40, 167, 69, 0.25)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(40, 167, 69, 0.15)';
+                            }}
+                          >
+                            🖨️
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => openLabelModal(order)}
+                            className="action-btn label-btn"
+                            title="📦 Generate Shipping Label"
+                            style={{
+                              background: 'rgba(212, 175, 55, 0.15)',
+                              color: '#D4AF37',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.25)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
+                            }}
+                          >
+                            📦
+                          </button>
+                        )}
                         
-                        {/* ✅ Tracking Button */}
+                        {/* Tracking */}
                         {order.status !== 'delivered' && order.status !== 'cancelled' && (
                           <button
                             onClick={() => handleAddTracking(order._id)}
@@ -635,7 +807,7 @@ const handleLabelGenerated = (labelData) => {
                           </button>
                         )}
                         
-                        {/* ✅ Delete Button */}
+                        {/* Delete */}
                         <button
                           onClick={() => deleteOrder(order._id)}
                           className="action-btn delete-btn"
@@ -645,7 +817,6 @@ const handleLabelGenerated = (labelData) => {
                         </button>
                       </div>
                       
-                      {/* Status Dropdown */}
                       <select
                         onChange={(e) => updateStatus(order._id, e.target.value)}
                         value={order.status || 'pending'}
@@ -774,6 +945,175 @@ const handleLabelGenerated = (labelData) => {
         </table>
       </div>
 
+      {/* ============================================ */}
+      {/* ✅ PRINT OPTIONS MODAL - NEW */}
+      {/* ============================================ */}
+      {showPrintOptions && printOrder && (
+        <div className="modal-overlay" onClick={() => setShowPrintOptions(false)}>
+          <div className="print-options-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>🖨️ Print Shipping Label</h3>
+              <button className="modal-close" onClick={() => setShowPrintOptions(false)}>✕</button>
+            </div>
+            
+            <div className="modal-body">
+              <div style={{ marginBottom: '16px' }}>
+                <p style={{ color: '#888', fontSize: '13px' }}>
+                  Order: <strong style={{ color: '#fff' }}>#{printOrder.orderId}</strong>
+                </p>
+                <p style={{ color: '#888', fontSize: '13px' }}>
+                  Customer: <strong style={{ color: '#fff' }}>{printOrder.customer?.name}</strong>
+                </p>
+                {printOrder.tracking?.number && (
+                  <p style={{ color: '#888', fontSize: '13px' }}>
+                    Tracking: <strong style={{ color: '#D4AF37' }}>{printOrder.tracking.number}</strong>
+                  </p>
+                )}
+              </div>
+
+              {/* Format Selection */}
+              <div className="form-group">
+                <label style={{ color: '#888', fontSize: '13px', display: 'block', marginBottom: '8px' }}>
+                  📄 Paper Format
+                </label>
+                <div className="print-format-grid" style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '10px'
+                }}>
+                  {printFormats.map(format => (
+                    <button
+                      key={format.value}
+                      type="button"
+                      className={`print-format-option ${printFormat === format.value ? 'active' : ''}`}
+                      onClick={() => setPrintFormat(format.value)}
+                      style={{
+                        padding: '12px 16px',
+                        border: `2px solid ${printFormat === format.value ? '#D4AF37' : '#333'}`,
+                        borderRadius: '8px',
+                        background: printFormat === format.value ? 'rgba(212, 175, 55, 0.05)' : 'transparent',
+                        color: printFormat === format.value ? '#D4AF37' : '#888',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.3s ease',
+                        fontFamily: 'Nunito, sans-serif'
+                      }}
+                    >
+                      <div style={{ fontSize: '24px', marginBottom: '4px' }}>{format.icon}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '600' }}>{format.label}</div>
+                      <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                        {format.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Number of Copies */}
+              <div className="form-group">
+                <label style={{ color: '#888', fontSize: '13px', display: 'block', marginBottom: '4px' }}>
+                  📋 Number of Copies
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <button
+                    onClick={() => setPrintCopies(Math.max(1, printCopies - 1))}
+                    style={{
+                      padding: '6px 14px',
+                      background: '#333',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '16px'
+                    }}
+                  >
+                    −
+                  </button>
+                  <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', minWidth: '40px', textAlign: 'center' }}>
+                    {printCopies}
+                  </span>
+                  <button
+                    onClick={() => setPrintCopies(Math.min(10, printCopies + 1))}
+                    style={{
+                      padding: '6px 14px',
+                      background: '#333',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '16px'
+                    }}
+                  >
+                    +
+                  </button>
+                  <span style={{ color: '#666', fontSize: '12px' }}>Max 10</span>
+                </div>
+              </div>
+
+              {/* Include Items List */}
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={printIncludeItems}
+                    onChange={(e) => setPrintIncludeItems(e.target.checked)}
+                    style={{ accentColor: '#D4AF37', width: '18px', height: '18px' }}
+                  />
+                  Include items list on label
+                </label>
+                <span style={{ color: '#666', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                  Recommended for A4/A5 formats, not needed for thermal labels
+                </span>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{
+              display: 'flex',
+              gap: '10px',
+              padding: '14px 20px',
+              borderTop: '1px solid #333',
+              background: '#0a0a0a',
+              borderRadius: '0 0 16px 16px'
+            }}>
+              <button
+                className="btn-secondary"
+                onClick={() => setShowPrintOptions(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  background: '#333',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                onClick={handlePrintLabel}
+                disabled={labelGenerating}
+                style={{
+                  flex: 2,
+                  padding: '10px',
+                  background: '#D4AF37',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#000',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  opacity: labelGenerating ? 0.6 : 1
+                }}
+              >
+                {labelGenerating ? '⏳ Generating...' : '🖨️ Print Label'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Order Details Modal */}
       {showOrderDetailsModal && selectedOrderForDetails && (
         <div className="modal-overlay" onClick={() => setShowOrderDetailsModal(false)}>
@@ -784,7 +1124,7 @@ const handleLabelGenerated = (labelData) => {
             </div>
 
             <div className="modal-body">
-              {/* Customer Information - Always Visible */}
+              {/* Customer Information */}
               <div className="detail-section customer-section">
                 <div className="section-header">
                   <h4>👤 Customer Information</h4>
@@ -798,7 +1138,7 @@ const handleLabelGenerated = (labelData) => {
                 </div>
               </div>
 
-              {/* Shipping Address - Always Visible */}
+              {/* Shipping Address */}
               <div className="detail-section shipping-section">
                 <div className="section-header">
                   <h4>📍 Shipping Address</h4>
@@ -817,7 +1157,7 @@ const handleLabelGenerated = (labelData) => {
                 )}
               </div>
 
-              {/* Order Items - Always Visible */}
+              {/* Order Items */}
               <div className="detail-section items-section">
                 <div className="section-header">
                   <h4>🛒 Order Items</h4>
@@ -846,7 +1186,7 @@ const handleLabelGenerated = (labelData) => {
                 </div>
               </div>
 
-              {/* Single Expandable Card for Hidden Details */}
+              {/* Expandable Details */}
               <div className={`expandable-card ${expandedModalSections.includes('allDetails') ? 'expanded' : ''}`}>
                 <div className="expandable-card-header" onClick={() => toggleModalSection('allDetails')}>
                   <span className="expand-icon">
@@ -859,7 +1199,6 @@ const handleLabelGenerated = (labelData) => {
                 
                 {expandedModalSections.includes('allDetails') && (
                   <div className="expandable-card-body">
-                    {/* Payment Information */}
                     <div className="detail-sub-section">
                       <h5>💳 Payment Information</h5>
                       <div className="detail-grid">
@@ -884,47 +1223,25 @@ const handleLabelGenerated = (labelData) => {
                       </div>
                     </div>
 
-                    {/* Order Breakdown */}
                     <div className="detail-sub-section">
                       <h5>💰 Order Breakdown</h5>
                       <div className="breakdown-grid">
-                        <div className="breakdown-item">
-                          <span>Subtotal</span>
-                          <span>{formatCurrency(selectedOrderForDetails.subtotal)}</span>
-                        </div>
-                        <div className="breakdown-item">
-                          <span>📦 Shipping</span>
-                          <span>{formatCurrency(selectedOrderForDetails.shipping)}</span>
-                        </div>
+                        <div className="breakdown-item"><span>Subtotal</span><span>{formatCurrency(selectedOrderForDetails.subtotal)}</span></div>
+                        <div className="breakdown-item"><span>📦 Shipping</span><span>{formatCurrency(selectedOrderForDetails.shipping)}</span></div>
                         {selectedOrderForDetails.platformFee > 0 && (
-                          <div className="breakdown-item">
-                            <span>🏷️ Platform Fee</span>
-                            <span>{formatCurrency(selectedOrderForDetails.platformFee)}</span>
-                          </div>
+                          <div className="breakdown-item"><span>🏷️ Platform Fee</span><span>{formatCurrency(selectedOrderForDetails.platformFee)}</span></div>
                         )}
                         {selectedOrderForDetails.gstAmount > 0 && (
-                          <div className="breakdown-item">
-                            <span>📊 GST ({selectedOrderForDetails.gstPercent || 12}%)</span>
-                            <span>{formatCurrency(selectedOrderForDetails.gstAmount)}</span>
-                          </div>
+                          <div className="breakdown-item"><span>📊 GST</span><span>{formatCurrency(selectedOrderForDetails.gstAmount)}</span></div>
                         )}
                         {selectedOrderForDetails.handlingFee > 0 && (
-                          <div className="breakdown-item">
-                            <span>🔧 Handling Fee</span>
-                            <span>{formatCurrency(selectedOrderForDetails.handlingFee)}</span>
-                          </div>
+                          <div className="breakdown-item"><span>🔧 Handling</span><span>{formatCurrency(selectedOrderForDetails.handlingFee)}</span></div>
                         )}
                         {selectedOrderForDetails.discount > 0 && (
-                          <div className="breakdown-item discount">
-                            <span>💰 Discount</span>
-                            <span>-{formatCurrency(selectedOrderForDetails.discount)}</span>
-                          </div>
+                          <div className="breakdown-item discount"><span>💰 Discount</span><span>-{formatCurrency(selectedOrderForDetails.discount)}</span></div>
                         )}
                         {selectedOrderForDetails.couponCode && (
-                          <div className="breakdown-item coupon">
-                            <span>🎟️ Coupon Applied</span>
-                            <span>✨ {selectedOrderForDetails.couponCode}</span>
-                          </div>
+                          <div className="breakdown-item coupon"><span>🎟️ Coupon</span><span>✨ {selectedOrderForDetails.couponCode}</span></div>
                         )}
                         <div className="breakdown-divider"></div>
                         <div className="breakdown-item total">
@@ -934,33 +1251,27 @@ const handleLabelGenerated = (labelData) => {
                       </div>
                     </div>
 
-                    {/* Order Timeline */}
                     <div className="detail-sub-section">
                       <h5>📋 Order Timeline</h5>
                       {selectedOrderForDetails.timeline?.map((event, idx) => (
                         <div key={idx} className="timeline-item">
-                          <span className="timeline-status">
-                            {getStatusIcon(event.status)} {event.status}
-                          </span>
+                          <span className="timeline-status">{getStatusIcon(event.status)} {event.status}</span>
                           <span className="timeline-desc">{event.description}</span>
                           <span className="timeline-date">{formatDate(event.timestamp)}</span>
                         </div>
                       ))}
                     </div>
 
-                    {/* Tracking Information */}
                     <div className="detail-sub-section">
                       <h5>📦 Tracking Information</h5>
                       {selectedOrderForDetails.tracking?.number ? (
                         <div className="tracking-details">
-                          <span><strong>📮 Tracking Number:</strong> {selectedOrderForDetails.tracking.number}</span>
+                          <span><strong>📮 Tracking:</strong> {selectedOrderForDetails.tracking.number}</span>
                           {selectedOrderForDetails.tracking.courierName && (
                             <span><strong>🚚 Courier:</strong> {selectedOrderForDetails.tracking.courierName}</span>
                           )}
                           {selectedOrderForDetails.tracking.url && (
-                            <a href={selectedOrderForDetails.tracking.url} target="_blank" rel="noopener noreferrer">
-                              🔗 Track Package →
-                            </a>
+                            <a href={selectedOrderForDetails.tracking.url} target="_blank" rel="noopener noreferrer">🔗 Track Package →</a>
                           )}
                         </div>
                       ) : (
@@ -973,12 +1284,8 @@ const handleLabelGenerated = (labelData) => {
             </div>
 
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowOrderDetailsModal(false)}>
-                ✕ Close
-              </button>
-              <button className="btn-primary" onClick={() => downloadInvoice(selectedOrderForDetails._id)}>
-                📄 Download Invoice
-              </button>
+              <button className="btn-secondary" onClick={() => setShowOrderDetailsModal(false)}>✕ Close</button>
+              <button className="btn-primary" onClick={() => downloadInvoice(selectedOrderForDetails._id)}>📄 Download Invoice</button>
             </div>
           </div>
         </div>
@@ -1041,18 +1348,14 @@ const handleLabelGenerated = (labelData) => {
             </div>
 
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowTrackingModal(false)}>
-                Cancel
-              </button>
-              <button className="btn-primary" onClick={submitTracking}>
-                ✅ Add Tracking
-              </button>
+              <button className="btn-secondary" onClick={() => setShowTrackingModal(false)}>Cancel</button>
+              <button className="btn-primary" onClick={submitTracking}>✅ Add Tracking</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ✅ Shipping Label Modal - NEW */}
+      {/* Shipping Label Modal */}
       {showLabelModal && selectedOrderForLabel && (
         <ShippingLabelModal
           isOpen={showLabelModal}
@@ -1064,6 +1367,82 @@ const handleLabelGenerated = (labelData) => {
           onLabelGenerated={handleLabelGenerated}
         />
       )}
+
+      {/* ============================================ */}
+      {/* STYLES FOR PRINT OPTIONS */}
+      {/* ============================================ */}
+      <style>{`
+        .print-options-modal {
+          background: #111;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 520px;
+          max-height: 90vh;
+          overflow: hidden;
+          border: 1px solid #333;
+          animation: modalSlideIn 0.3s ease;
+        }
+
+        .print-options-modal .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 16px 20px;
+          border-bottom: 1px solid #333;
+          background: #111;
+        }
+
+        .print-options-modal .modal-header h3 {
+          color: #D4AF37;
+          margin: 0;
+          font-size: 18px;
+          font-family: 'Nunito', sans-serif;
+        }
+
+        .print-options-modal .modal-body {
+          padding: 20px;
+          overflow-y: auto;
+          max-height: calc(90vh - 140px);
+        }
+
+        .print-options-modal .modal-footer {
+          display: flex;
+          gap: 10px;
+          padding: 14px 20px;
+          border-top: 1px solid #333;
+          background: #0a0a0a;
+        }
+
+        .print-format-option:hover {
+          border-color: #666 !important;
+          transform: translateY(-2px);
+        }
+
+        .print-format-option.active {
+          border-color: #D4AF37 !important;
+          background: rgba(212, 175, 55, 0.05) !important;
+          color: #D4AF37 !important;
+          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.1);
+        }
+
+        .print-format-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 10px;
+        }
+
+        @media (max-width: 480px) {
+          .print-format-grid {
+            grid-template-columns: 1fr;
+          }
+          
+          .print-options-modal {
+            max-width: 100%;
+            margin: 10px;
+            border-radius: 12px;
+          }
+        }
+      `}</style>
     </div>
   );
 }
