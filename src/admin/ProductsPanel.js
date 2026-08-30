@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
@@ -35,6 +36,15 @@ function ProductsPanel() {
   // Variant states
   const [variantTypes, setVariantTypes] = useState([]);
   const [variantOptions, setVariantOptions] = useState({});
+  
+  // Upload states
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSuccess, setUploadSuccess] = useState('');
+  const [uploadError, setUploadError] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+  const videoInputRef = useRef(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -116,9 +126,155 @@ function ProductsPanel() {
     setEditingProduct(null);
     setError('');
     setSuccess('');
+    setUploadSuccess('');
+    setUploadError('');
   };
 
+  // ============================================
+  // FILE UPLOAD HANDLERS
+  // ============================================
+
+  const handleFileSelect = async (files, type = 'image') => {
+    if (!files || files.length === 0) return;
+    
+    setUploading(true);
+    setUploadProgress(0);
+    setUploadError('');
+    setUploadSuccess('');
+
+    const formDataObj = new FormData();
+    const maxFiles = type === 'image' ? 10 : 1;
+    const maxSize = type === 'image' ? 5 * 1024 * 1024 : 50 * 1024 * 1024;
+    const validFiles = [];
+
+    for (const file of files) {
+      if (file.size > maxSize) {
+        setUploadError(`File too large: ${file.name} (max ${type === 'image' ? '5MB' : '50MB'})`);
+        continue;
+      }
+      if (type === 'image' && !file.type.startsWith('image/')) {
+        setUploadError(`Invalid file type: ${file.name} (must be image)`);
+        continue;
+      }
+      if (type === 'video' && !file.type.startsWith('video/')) {
+        setUploadError(`Invalid file type: ${file.name} (must be video)`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      setUploading(false);
+      return;
+    }
+
+    const productId = editingProduct?._id || Date.now().toString();
+    const folder = type === 'image' ? 'loop/products' : 'loop/videos';
+    
+    validFiles.forEach(file => {
+      formDataObj.append(type === 'image' ? 'images' : 'video', file);
+    });
+    formDataObj.append('productId', productId);
+    formDataObj.append('folder', folder);
+
+    try {
+      const token = localStorage.getItem('loop_token');
+      const endpoint = type === 'image' ? `${API_URL}/api/upload/images` : `${API_URL}/api/upload/video`;
+      
+      const response = await axios.post(endpoint, formDataObj, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
+      });
+
+      if (type === 'image') {
+        const urls = response.data.images.map(img => img.urls.original);
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, ...urls],
+          mediaUrls: [...prev.mediaUrls, ...urls]
+        }));
+        setUploadSuccess(`✅ ${urls.length} images uploaded successfully!`);
+      } else {
+        const url = response.data.url;
+        setFormData(prev => ({
+          ...prev,
+          videos: [...prev.videos, url],
+          mediaUrls: [...prev.mediaUrls, url]
+        }));
+        setUploadSuccess('✅ Video uploaded successfully!');
+      }
+
+      setTimeout(() => setUploadSuccess(''), 4000);
+    } catch (err) {
+      setUploadError(err.response?.data?.error || 'Upload failed');
+      setTimeout(() => setUploadError(''), 4000);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const hasVideo = Array.from(files).some(f => f.type.startsWith('video/'));
+      const hasImage = Array.from(files).some(f => f.type.startsWith('image/'));
+      if (hasVideo && hasImage) {
+        setUploadError('Please upload images and videos separately');
+        return;
+      }
+      handleFileSelect(files, hasVideo ? 'video' : 'image');
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const removeMedia = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      mediaUrls: prev.mediaUrls.filter((_, i) => i !== index),
+      images: prev.images.filter((_, i) => i !== index),
+      videos: prev.videos.filter((_, i) => i !== index)
+    }));
+  };
+
+  const moveMediaUp = (index) => {
+    if (index === 0) return;
+    setFormData(prev => {
+      const newMedia = [...prev.mediaUrls];
+      [newMedia[index], newMedia[index - 1]] = [newMedia[index - 1], newMedia[index]];
+      return { ...prev, mediaUrls: newMedia };
+    });
+  };
+
+  const moveMediaDown = (index) => {
+    if (index === formData.mediaUrls.length - 1) return;
+    setFormData(prev => {
+      const newMedia = [...prev.mediaUrls];
+      [newMedia[index], newMedia[index + 1]] = [newMedia[index + 1], newMedia[index]];
+      return { ...prev, mediaUrls: newMedia };
+    });
+  };
+
+  // ============================================
   // Variant functions
+  // ============================================
+
   const addVariantType = () => {
     const type = prompt('Enter variant type (e.g., Size, Color, Engine):');
     if (type && type.trim()) {
@@ -153,6 +309,10 @@ function ProductsPanel() {
     newOptions[type][index] = { ...newOptions[type][index], [field]: value };
     setVariantOptions(newOptions);
   };
+
+  // ============================================
+  // Product CRUD operations
+  // ============================================
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this product? This action cannot be undone.')) return;
@@ -642,7 +802,7 @@ function ProductsPanel() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.9)',
+          background: 'rgba(0,0,0,0.95)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -654,7 +814,7 @@ function ProductsPanel() {
             background: '#111',
             padding: '30px',
             borderRadius: '12px',
-            width: '650px',
+            width: '700px',
             maxHeight: '90vh',
             overflow: 'auto',
             border: '1px solid #333'
@@ -666,6 +826,18 @@ function ProductsPanel() {
             {error && (
               <div style={{ background: '#ff4444', color: 'white', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>
                 {error}
+              </div>
+            )}
+            
+            {uploadError && (
+              <div style={{ background: '#ff4444', color: 'white', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>
+                ❌ {uploadError}
+              </div>
+            )}
+            
+            {uploadSuccess && (
+              <div style={{ background: '#28a745', color: 'white', padding: '10px', borderRadius: '4px', marginBottom: '15px' }}>
+                {uploadSuccess}
               </div>
             )}
             
@@ -724,7 +896,6 @@ function ProductsPanel() {
                     borderRadius: '6px'
                   }}
                   required
-                  // ✅ Remove spinner arrows
                   step="any"
                   onWheel={(e) => e.target.blur()}
                 />
@@ -789,7 +960,9 @@ function ProductsPanel() {
               />
             </div>
 
-            {/* Media Gallery */}
+            {/* ============================================ */}
+            {/* MEDIA SECTION - WITH FILE UPLOAD */}
+            {/* ============================================ */}
             <div style={{ 
               border: '1px solid #333', 
               borderRadius: '8px', 
@@ -801,183 +974,300 @@ function ProductsPanel() {
                 <label style={{ color: '#D4AF37', fontSize: '14px', fontWeight: 'bold' }}>
                   📸 Images & Videos
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newMedia = [...formData.mediaUrls, ''];
-                    setFormData({ ...formData, mediaUrls: newMedia });
-                  }}
-                  style={{
-                    background: '#D4AF37',
-                    border: 'none',
-                    padding: '6px 16px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: 'bold',
-                    color: '#000'
-                  }}
-                >
-                  + Add Media
-                </button>
-              </div>
-
-              <p style={{ color: '#666', fontSize: '12px', marginBottom: '12px' }}>
-                💡 Add image or video URLs (YouTube, Vimeo, MP4, etc.)
-              </p>
-
-              {formData.mediaUrls.map((url, index) => {
-                const isVideo = isVideoUrl(url);
-                const isImage = !isVideo && url.trim() !== '';
-                
-                return (
-                  <div 
-                    key={index} 
-                    style={{ 
-                      display: 'flex', 
-                      gap: '10px', 
-                      marginBottom: '10px', 
-                      alignItems: 'center',
-                      padding: '8px',
-                      background: '#222',
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => document.getElementById('file-upload-input').click()}
+                    style={{
+                      background: '#D4AF37',
+                      border: 'none',
+                      padding: '6px 16px',
                       borderRadius: '6px',
-                      border: '1px solid #333'
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#000'
                     }}
                   >
-                    <div style={{ 
-                      width: '24px', 
-                      fontSize: '18px',
-                      textAlign: 'center'
-                    }}>
-                      {isVideo ? '🎬' : isImage ? '🖼️' : '📄'}
-                    </div>
-                    
-                    <input
-                      type="text"
-                      placeholder="Enter image or video URL..."
-                      value={url}
-                      onChange={(e) => {
-                        const newMedia = [...formData.mediaUrls];
-                        newMedia[index] = e.target.value;
-                        setFormData({ ...formData, mediaUrls: newMedia });
-                      }}
-                      style={{
-                        flex: 1,
-                        padding: '10px 12px',
-                        background: '#1a1a1a',
-                        border: isVideo ? '1px solid #8B5CF6' : isImage ? '1px solid #4CAF50' : '1px solid #333',
-                        color: 'white',
-                        borderRadius: '4px',
-                        fontSize: '13px'
-                      }}
-                    />
-                    
-                    {url.trim() !== '' && (
-                      <span style={{ 
-                        fontSize: '10px', 
-                        padding: '2px 10px', 
-                        borderRadius: '12px',
-                        background: isVideo ? 'rgba(139, 92, 246, 0.2)' : 'rgba(76, 175, 80, 0.2)',
-                        color: isVideo ? '#8B5CF6' : '#4CAF50',
-                        border: `1px solid ${isVideo ? '#8B5CF6' : '#4CAF50'}`
-                      }}>
-                        {isVideo ? '🎬 Video' : '🖼️ Image'}
-                      </span>
-                    )}
-                    
-                    {formData.mediaUrls.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newMedia = formData.mediaUrls.filter((_, i) => i !== index);
-                          setFormData({ ...formData, mediaUrls: newMedia });
-                        }}
-                        style={{
-                          background: '#ff4444',
-                          border: 'none',
-                          padding: '4px 10px',
-                          borderRadius: '4px',
-                          cursor: 'pointer',
-                          color: 'white',
-                          fontSize: '14px'
-                        }}
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+                    📤 Upload Files
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newMedia = [...formData.mediaUrls, ''];
+                      setFormData({ ...formData, mediaUrls: newMedia });
+                    }}
+                    style={{
+                      background: '#333',
+                      border: 'none',
+                      padding: '6px 16px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: '#888'
+                    }}
+                  >
+                    + Add URL
+                  </button>
+                </div>
+              </div>
 
-              {/* Preview */}
-              {formData.mediaUrls.filter(u => u.trim() !== '').length > 0 && (
-                <div style={{ marginTop: '12px' }}>
-                  <p style={{ color: '#666', fontSize: '11px', marginBottom: '8px' }}>
-                    📋 Preview ({formData.mediaUrls.filter(u => u.trim() !== '').length} items)
-                  </p>
-                  <div style={{ 
-                    display: 'flex', 
-                    flexWrap: 'wrap', 
-                    gap: '8px',
-                    maxHeight: '120px',
-                    overflowY: 'auto'
+              {/* Hidden file inputs */}
+              <input
+                id="file-upload-input"
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  if (e.target.files.length > 0) {
+                    const files = Array.from(e.target.files);
+                    const hasVideo = files.some(f => f.type.startsWith('video/'));
+                    const hasImage = files.some(f => f.type.startsWith('image/'));
+                    if (hasVideo && hasImage) {
+                      setUploadError('Please upload images and videos separately');
+                      return;
+                    }
+                    handleFileSelect(files, hasVideo ? 'video' : 'image');
+                    e.target.value = '';
+                  }
+                }}
+              />
+
+              {/* Drag & Drop Zone */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                style={{
+                  border: `2px dashed ${isDragging ? '#D4AF37' : '#333'}`,
+                  borderRadius: '8px',
+                  padding: '20px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  background: isDragging ? 'rgba(212, 175, 55, 0.05)' : 'transparent',
+                  marginBottom: '12px'
+                }}
+                onClick={() => document.getElementById('file-upload-input').click()}
+              >
+                <div style={{ fontSize: '32px' }}>📤</div>
+                <div style={{ color: '#888', fontSize: '14px' }}>
+                  {isDragging ? '⭐ Drop your files here!' : 'Drag & drop images/videos or click to browse'}
+                </div>
+                <div style={{ color: '#666', fontSize: '12px' }}>
+                  Images: JPG, PNG, WebP • Max 5MB each • Video: MP4, WebM • Max 50MB
+                </div>
+              </div>
+
+              {/* Upload Progress */}
+              {uploading && (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{
+                    height: '4px',
+                    background: '#222',
+                    borderRadius: '2px',
+                    overflow: 'hidden'
                   }}>
-                    {formData.mediaUrls.filter(u => u.trim() !== '').map((url, idx) => {
+                    <div style={{
+                      height: '100%',
+                      width: `${uploadProgress}%`,
+                      background: 'linear-gradient(90deg, #D4AF37, #FFB7C5)',
+                      borderRadius: '2px',
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                  <div style={{ color: '#888', fontSize: '12px', marginTop: '4px', textAlign: 'center' }}>
+                    Uploading... {uploadProgress}%
+                  </div>
+                </div>
+              )}
+
+              {/* Media List with Order Controls */}
+              {formData.mediaUrls.length > 0 && (
+                <div>
+                  <div style={{ color: '#666', fontSize: '11px', marginBottom: '8px' }}>
+                    📋 {formData.mediaUrls.filter(u => u.trim() !== '').length} media items
+                    <span style={{ marginLeft: '8px', color: '#555' }}>(Drag arrows to reorder)</span>
+                  </div>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                    {formData.mediaUrls.map((url, index) => {
                       const isVideo = isVideoUrl(url);
+                      const isImage = !isVideo && url.trim() !== '';
+                      
                       return (
-                        <div key={idx} style={{ position: 'relative' }}>
-                          {isVideo ? (
-                            <div style={{
-                              width: '80px',
-                              height: '80px',
-                              background: '#222',
-                              borderRadius: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '1px solid #8B5CF6'
-                            }}>
-                              <span style={{ fontSize: '32px' }}>🎬</span>
-                            </div>
-                          ) : (
-                            <img 
-                              src={url} 
-                              alt={`Media ${idx + 1}`}
-                              style={{ 
-                                width: '80px', 
-                                height: '80px', 
-                                objectFit: 'cover', 
-                                borderRadius: '4px',
-                                border: '1px solid #333'
-                              }}
-                              onError={(e) => {
-                                e.target.style.display = 'none';
-                              }}
-                            />
-                          )}
-                          <span style={{
-                            position: 'absolute',
-                            top: '-4px',
-                            right: '-4px',
-                            background: '#D4AF37',
-                            color: '#000',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            fontSize: '10px',
-                            display: 'flex',
+                        <div 
+                          key={index} 
+                          style={{ 
+                            display: 'flex', 
+                            gap: '10px', 
+                            marginBottom: '8px', 
                             alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 'bold'
+                            padding: '8px',
+                            background: '#222',
+                            borderRadius: '6px',
+                            border: '1px solid #333'
+                          }}
+                        >
+                          <div style={{ 
+                            width: '24px', 
+                            fontSize: '18px',
+                            textAlign: 'center'
                           }}>
-                            {idx + 1}
-                          </span>
+                            {isVideo ? '🎬' : isImage ? '🖼️' : '📄'}
+                          </div>
+                          
+                          <input
+                            type="text"
+                            placeholder="Enter image or video URL..."
+                            value={url}
+                            onChange={(e) => {
+                              const newMedia = [...formData.mediaUrls];
+                              newMedia[index] = e.target.value;
+                              setFormData({ ...formData, mediaUrls: newMedia });
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '8px 12px',
+                              background: '#1a1a1a',
+                              border: isVideo ? '1px solid #8B5CF6' : isImage ? '1px solid #4CAF50' : '1px solid #333',
+                              color: 'white',
+                              borderRadius: '4px',
+                              fontSize: '13px'
+                            }}
+                          />
+                          
+                          {/* Order Controls */}
+                          <button
+                            type="button"
+                            onClick={() => moveMediaUp(index)}
+                            disabled={index === 0}
+                            style={{
+                              background: '#333',
+                              border: 'none',
+                              color: index === 0 ? '#555' : '#fff',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: index === 0 ? 'not-allowed' : 'pointer',
+                              fontSize: '14px'
+                            }}
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveMediaDown(index)}
+                            disabled={index === formData.mediaUrls.length - 1}
+                            style={{
+                              background: '#333',
+                              border: 'none',
+                              color: index === formData.mediaUrls.length - 1 ? '#555' : '#fff',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: index === formData.mediaUrls.length - 1 ? 'not-allowed' : 'pointer',
+                              fontSize: '14px'
+                            }}
+                          >
+                            ▼
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => removeMedia(index)}
+                            style={{
+                              background: '#ff4444',
+                              border: 'none',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              color: 'white',
+                              fontSize: '14px'
+                            }}
+                          >
+                            ✕
+                          </button>
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* Preview Gallery */}
+                  {formData.mediaUrls.filter(u => u.trim() !== '').length > 0 && (
+                    <div style={{ marginTop: '12px' }}>
+                      <div style={{ color: '#666', fontSize: '11px', marginBottom: '8px' }}>
+                        🖼️ Preview ({formData.mediaUrls.filter(u => u.trim() !== '').length} items)
+                      </div>
+                      <div style={{ 
+                        display: 'flex', 
+                        flexWrap: 'wrap', 
+                        gap: '8px',
+                        maxHeight: '120px',
+                        overflowY: 'auto'
+                      }}>
+                        {formData.mediaUrls.filter(u => u.trim() !== '').map((url, idx) => {
+                          const isVideo = isVideoUrl(url);
+                          return (
+                            <div key={idx} style={{ position: 'relative' }}>
+                              {isVideo ? (
+                                <div style={{
+                                  width: '80px',
+                                  height: '80px',
+                                  background: '#222',
+                                  borderRadius: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: '1px solid #8B5CF6'
+                                }}>
+                                  <span style={{ fontSize: '32px' }}>🎬</span>
+                                </div>
+                              ) : (
+                                <img 
+                                  src={url} 
+                                  alt={`Media ${idx + 1}`}
+                                  style={{ 
+                                    width: '80px', 
+                                    height: '80px', 
+                                    objectFit: 'cover', 
+                                    borderRadius: '4px',
+                                    border: '1px solid #333'
+                                  }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                  }}
+                                />
+                              )}
+                              <span style={{
+                                position: 'absolute',
+                                top: '-4px',
+                                right: '-4px',
+                                background: '#D4AF37',
+                                color: '#000',
+                                borderRadius: '50%',
+                                width: '18px',
+                                height: '18px',
+                                fontSize: '10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 'bold'
+                              }}>
+                                {idx + 1}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
+              <p style={{ color: '#666', fontSize: '12px', marginTop: '12px' }}>
+                💡 Upload images/videos directly or enter URLs (YouTube, Vimeo, etc.)
+              </p>
             </div>
 
             {/* Variants Builder */}
