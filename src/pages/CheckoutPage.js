@@ -8,17 +8,17 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onre
 
 function CheckoutPage() {
   const navigate = useNavigate();
-  
+
   // Cart State
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  
+
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [pollAttempts, setPollAttempts] = useState(0);
-  
+
   // Coupon State
   const [couponCode, setCouponCode] = useState('');
   const [couponError, setCouponError] = useState('');
@@ -28,7 +28,7 @@ function CheckoutPage() {
   const [availableCoupons, setAvailableCoupons] = useState([]);
   const [showAvailableCoupons, setShowAvailableCoupons] = useState(false);
   const [loadingCoupons, setLoadingCoupons] = useState(false);
-  
+
   // Address States
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -37,7 +37,9 @@ function CheckoutPage() {
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [editingAddressIndex, setEditingAddressIndex] = useState(null);
-  
+  const [pincodeChecking, setPincodeChecking] = useState(false);
+  const [pincodeInfo, setPincodeInfo] = useState(null);
+
   // Address Form
   const [addressFormData, setAddressFormData] = useState({
     name: '',
@@ -50,7 +52,7 @@ function CheckoutPage() {
     label: 'Home',
     isDefault: false
   });
-  
+
   // Fee States
   const [subtotal, setSubtotal] = useState(0);
   const [shippingFee, setShippingFee] = useState(60);
@@ -74,16 +76,16 @@ function CheckoutPage() {
         setCart([]);
       }
     }
-    
+
     const token = localStorage.getItem('loop_token');
     const userData = localStorage.getItem('loop_user');
-    
+
     if (token && userData) {
       try {
         const userObj = JSON.parse(userData);
         setUser(userObj);
         setIsLoggedIn(true);
-        
+
         if (userObj.addresses && userObj.addresses.length > 0) {
           setSavedAddresses(userObj.addresses);
           const defaultAddr = userObj.addresses.find(a => a.isDefault);
@@ -97,10 +99,29 @@ function CheckoutPage() {
     } else {
       setShowAddressForm(true);
     }
-    
+
     fetchActivePayment();
     fetchAvailableCoupons();
   }, []);
+
+  // ✅ Verify pincode serviceability via Shiprocket
+  const checkPincodeServiceability = async (pincode) => {
+    setPincodeChecking(true);
+    setPincodeInfo(null);
+    try {
+      const response = await axios.post(`${API_URL}/api/shiprocket/check-pincode`, {
+        pincode,
+        weight: 0.5
+      });
+      setPincodeInfo(response.data);
+      return response.data;
+    } catch (err) {
+      console.error('Pincode check error:', err);
+      return null;
+    } finally {
+      setPincodeChecking(false);
+    }
+  };
 
   // ✅ Fetch available coupons
   const fetchAvailableCoupons = async () => {
@@ -115,52 +136,49 @@ function CheckoutPage() {
     }
   };
 
-  // ✅ FIXED: Calculate totals with proper price handling
+  // Calculate totals with proper price handling
   const calculateTotals = (cartItems) => {
-    // Make sure cartItems is an array
     const items = cartItems || [];
-    
+
     console.log('📦 Calculating totals for:', items.length, 'items');
-    
-    // Calculate subtotal with proper price fallback
+
     const subtotal = items.reduce((sum, item) => {
-      // Try multiple price field names
-      const price = item.price || 
-                    item.salePrice || 
-                    item.productPrice || 
-                    item.displayPrice || 
+      const price = item.price ||
+                    item.salePrice ||
+                    item.productPrice ||
+                    item.displayPrice ||
                     item.originalPrice ||
                     item.amount ||
                     item.product?.price ||
                     item.product?.salePrice ||
                     0;
-      
+
       const quantity = item.quantity || item.qty || 1;
       const itemTotal = price * quantity;
-      
+
       console.log(`📦 ${item.name || 'Item'}: ₹${price} × ${quantity} = ₹${itemTotal}`);
-      
+
       return sum + itemTotal;
     }, 0);
-    
+
     console.log('💰 Subtotal calculated:', subtotal);
     setSubtotal(subtotal);
-    
+
     const shipping = subtotal > 999 ? 0 : 60;
     setShippingFee(shipping);
-    
+
     const platform = 0;
     setPlatformFee(platform);
-    
+
     const handling = 0;
     setHandlingFee(handling);
-    
+
     const total = subtotal + shipping + platform + handling - couponDiscount;
     console.log('💰 Final total:', total);
     setFinalTotal(total);
   };
 
-  // ✅ Recalculate when coupon changes
+  // Recalculate when coupon changes
   useEffect(() => {
     if (cart.length > 0) {
       calculateTotals(cart);
@@ -185,52 +203,66 @@ function CheckoutPage() {
       ...addressFormData,
       [name]: type === 'checkbox' ? checked : value
     });
+
+    // Auto-check pincode when 6 digits entered
+    if (name === 'pincode' && /^\d{6}$/.test(value)) {
+      checkPincodeServiceability(value);
+    } else if (name === 'pincode') {
+      setPincodeInfo(null);
+    }
   };
 
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!addressFormData.name || !addressFormData.street || !addressFormData.city || 
+
+    if (!addressFormData.name || !addressFormData.street || !addressFormData.city ||
         !addressFormData.state || !addressFormData.pincode || !addressFormData.phone) {
       alert('Please fill in all required fields');
       return;
     }
-    
+
+    // ✅ Verify serviceability BEFORE saving
+    const serviceability = await checkPincodeServiceability(addressFormData.pincode);
+    if (serviceability && !serviceability.serviceable) {
+      alert('Sorry — we cannot deliver to this pincode yet. Please try a different address.');
+      return;
+    }
+
     if (isLoggedIn && user) {
       try {
         const token = localStorage.getItem('loop_token');
         let updatedAddresses;
-        
+
         if (isEditingAddress && editingAddressIndex !== null) {
           updatedAddresses = [...savedAddresses];
           updatedAddresses[editingAddressIndex] = addressFormData;
         } else {
           updatedAddresses = [...savedAddresses, addressFormData];
         }
-        
+
         if (addressFormData.isDefault) {
           updatedAddresses = updatedAddresses.map(addr => ({
             ...addr,
             isDefault: addr === addressFormData || (isEditingAddress && savedAddresses.indexOf(addr) === editingAddressIndex)
           }));
         }
-        
+
         await axios.put(
           `${API_URL}/api/users/${user.id}`,
           { addresses: updatedAddresses },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        
+
         setSavedAddresses(updatedAddresses);
         setSelectedAddress(addressFormData);
         setShowAddressForm(false);
         setIsEditingAddress(false);
         setEditingAddressIndex(null);
-        
+
         const updatedUser = { ...user, addresses: updatedAddresses };
         setUser(updatedUser);
         localStorage.setItem('loop_user', JSON.stringify(updatedUser));
-        
+
       } catch (err) {
         alert('Failed to save address. Please try again.');
       }
@@ -246,13 +278,20 @@ function CheckoutPage() {
     setIsEditingAddress(true);
     setEditingAddressIndex(index);
     setShowAddressForm(true);
+    // Pre-check pincode
+    if (savedAddresses[index].pincode) {
+      checkPincodeServiceability(savedAddresses[index].pincode);
+    }
   };
 
   const selectSavedAddress = (address) => {
     setSelectedAddress(address);
+    if (address.pincode) {
+      checkPincodeServiceability(address.pincode);
+    }
   };
 
-  // ✅ Apply Coupon
+  // Apply Coupon
   const applyCoupon = async () => {
     if (!couponCode.trim()) {
       setCouponError('Please enter a coupon code');
@@ -283,7 +322,6 @@ function CheckoutPage() {
         setAppliedCoupon(response.data);
         setCouponSuccess(`✅ You saved ₹${discountAmount}`);
         setCouponError('');
-        // Recalculate with new discount
         calculateTotals(cart);
       } else {
         setCouponError(response.data.message || 'Invalid coupon');
@@ -294,9 +332,8 @@ function CheckoutPage() {
     }
   };
 
-  // ✅ Remove Coupon
+  // Remove Coupon
   const removeCoupon = () => {
-    console.log('🎟️ Removing coupon');
     setCouponDiscount(0);
     setCouponCode('');
     setCouponSuccess('');
@@ -305,67 +342,58 @@ function CheckoutPage() {
     calculateTotals(cart);
   };
 
-  // ✅ FIXED: Direct apply coupon without state delay
-const quickApplyCoupon = (coupon) => {
-  console.log('🎟️ Quick apply:', coupon.code);
-  setShowAvailableCoupons(false);
-  
-  // Directly apply the coupon without waiting for state
-  applyCouponDirect(coupon.code);
-};
+  // ✅ Direct apply coupon without state delay
+  const quickApplyCoupon = (coupon) => {
+    setShowAvailableCoupons(false);
+    applyCouponDirect(coupon.code);
+  };
 
-// ✅ NEW: Direct coupon application
-const applyCouponDirect = async (code) => {
-  if (!code || !code.trim()) {
-    setCouponError('Please enter a coupon code');
-    return;
-  }
-
-  setCouponError('');
-  setCouponSuccess('');
-  setCouponCode(code); // Update UI
-
-  try {
-    const token = localStorage.getItem('loop_token');
-    const userId = user?.id || null;
-
-    console.log('🎟️ Applying coupon directly:', code, 'Subtotal:', subtotal);
-
-    const response = await axios.post(`${API_URL}/api/coupons/validate`, {
-      code: code.toUpperCase(),
-      userId,
-      cartTotal: subtotal
-    });
-
-    console.log('🎟️ Coupon response:', response.data);
-
-    if (response.data.valid) {
-      const discountAmount = response.data.discountAmount || 0;
-      console.log('🎟️ Discount amount:', discountAmount);
-      setCouponDiscount(discountAmount);
-      setAppliedCoupon(response.data);
-      setCouponSuccess(`✅ You saved ₹${discountAmount}`);
-      setCouponError('');
-      calculateTotals(cart);
-    } else {
-      setCouponError(response.data.message || 'Invalid coupon');
+  const applyCouponDirect = async (code) => {
+    if (!code || !code.trim()) {
+      setCouponError('Please enter a coupon code');
+      return;
     }
-  } catch (error) {
-    console.error('Coupon error:', error);
-    setCouponError(error.response?.data?.message || 'Failed to apply coupon');
-  }
-};
+
+    setCouponError('');
+    setCouponSuccess('');
+    setCouponCode(code);
+
+    try {
+      const token = localStorage.getItem('loop_token');
+      const userId = user?.id || null;
+
+      const response = await axios.post(`${API_URL}/api/coupons/validate`, {
+        code: code.toUpperCase(),
+        userId,
+        cartTotal: subtotal
+      });
+
+      if (response.data.valid) {
+        const discountAmount = response.data.discountAmount || 0;
+        setCouponDiscount(discountAmount);
+        setAppliedCoupon(response.data);
+        setCouponSuccess(`✅ You saved ₹${discountAmount}`);
+        setCouponError('');
+        calculateTotals(cart);
+      } else {
+        setCouponError(response.data.message || 'Invalid coupon');
+      }
+    } catch (error) {
+      console.error('Coupon error:', error);
+      setCouponError(error.response?.data?.message || 'Failed to apply coupon');
+    }
+  };
 
   const createOrder = async () => {
     try {
       const token = localStorage.getItem('loop_token');
       const cart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
-      
+
       if (!selectedAddress) {
         alert('Please add a shipping address');
         return null;
       }
-      
+
       const orderItems = cart.map(item => ({
         productId: item._id || item.id || item.productId,
         name: item.name,
@@ -374,7 +402,7 @@ const applyCouponDirect = async (code) => {
         size: item.size || 'M',
         color: item.color || 'Black'
       }));
-      
+
       const orderData = {
         customer: {
           name: selectedAddress.name || user?.name || 'Guest',
@@ -403,14 +431,14 @@ const applyCouponDirect = async (code) => {
       console.log('📦 Creating order:', orderData);
 
       const response = await axios.post(`${API_URL}/api/orders`, orderData, {
-        headers: { 
+        headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
-      
+
       return response.data;
-      
+
     } catch (err) {
       console.error('Error creating order:', err);
       throw err;
@@ -435,21 +463,30 @@ const applyCouponDirect = async (code) => {
       alert('Please add a shipping address first');
       return;
     }
-    
+
+    // ✅ Final serviceability check before payment
+    if (selectedAddress.pincode) {
+      const serviceability = await checkPincodeServiceability(selectedAddress.pincode);
+      if (serviceability && !serviceability.serviceable) {
+        alert('This pincode is not serviceable. Please change the address.');
+        return;
+      }
+    }
+
     setProcessing(true);
     setPaymentStatus('pending');
     setPollAttempts(0);
     setShowSupport(false);
-    
+
     try {
       const order = await createOrder();
       if (!order) {
         setProcessing(false);
         return;
       }
-      
+
       setOrderId(order.orderId);
-      
+
       const token = localStorage.getItem('loop_token');
       const response = await axios.post(`${API_URL}/api/create-razorpay-order`, {
         amount: finalTotal,
@@ -457,9 +494,9 @@ const applyCouponDirect = async (code) => {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       const razorpayOrder = response.data;
-      
+
       const options = {
         key: process.env.REACT_APP_RAZORPAY_KEY_ID || 'rzp_test_TTXVg2yp3HlxlP',
         amount: razorpayOrder.amount,
@@ -486,16 +523,16 @@ const applyCouponDirect = async (code) => {
             axios.post(`${API_URL}/api/orders/cancel-pending/${order.orderId}`, {}, {
               headers: { Authorization: `Bearer ${token}` }
             }).catch(() => {});
-            
+
             setProcessing(false);
             setPaymentStatus('pending');
           }
         }
       };
-      
+
       const rzp = new window.Razorpay(options);
       rzp.open();
-      
+
     } catch (err) {
       console.error('Razorpay error:', err);
       setProcessing(false);
@@ -507,7 +544,7 @@ const applyCouponDirect = async (code) => {
 
   const verifyRazorpayPayment = async (paymentResponse, orderId) => {
     setPaymentStatus('verifying');
-    
+
     try {
       const token = localStorage.getItem('loop_token');
       const response = await axios.post(`${API_URL}/api/verify-razorpay-payment`, {
@@ -518,12 +555,12 @@ const applyCouponDirect = async (code) => {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.data.success) {
         setPaymentStatus('confirmed');
         setProcessing(false);
         await clearCartAfterOrder();
-        navigate('/order-confirmation', { 
+        navigate('/order-confirmation', {
           state: { order: response.data.order }
         });
       } else {
@@ -580,11 +617,11 @@ const applyCouponDirect = async (code) => {
               <div className="section-header">
                 <h3>📍 Shipping Address</h3>
               </div>
-              
+
               {isLoggedIn && savedAddresses.length > 0 && !showAddressForm && (
                 <div className="address-list">
                   {savedAddresses.map((addr, index) => (
-                    <div 
+                    <div
                       key={index}
                       className={`address-card ${selectedAddress === addr ? 'selected' : ''}`}
                       onClick={() => selectSavedAddress(addr)}
@@ -598,7 +635,7 @@ const applyCouponDirect = async (code) => {
                       </div>
                       <div className="address-card-right">
                         {addr.isDefault && <span className="default-badge">Default</span>}
-                        <button 
+                        <button
                           className="edit-address-btn"
                           onClick={(e) => { e.stopPropagation(); editAddress(index); }}
                         >
@@ -607,10 +644,10 @@ const applyCouponDirect = async (code) => {
                       </div>
                     </div>
                   ))}
-                  
+
                   <button
                     className="add-address-btn"
-                    onClick={() => { setShowAddressForm(true); setIsEditingAddress(false); setAddressFormData({ name: '', street: '', city: '', state: '', pincode: '', phone: '', landmark: '', label: 'Home', isDefault: false }); }}
+                    onClick={() => { setShowAddressForm(true); setIsEditingAddress(false); setAddressFormData({ name: '', street: '', city: '', state: '', pincode: '', phone: '', landmark: '', label: 'Home', isDefault: false }); setPincodeInfo(null); }}
                   >
                     + Add New Address
                   </button>
@@ -686,6 +723,21 @@ const applyCouponDirect = async (code) => {
                         required
                         maxLength="6"
                       />
+                      {pincodeChecking && (
+                        <span style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>
+                          ⏳ Checking delivery...
+                        </span>
+                      )}
+                      {pincodeInfo && pincodeInfo.serviceable && (
+                        <span style={{ fontSize: '12px', color: '#28a745', marginTop: '4px' }}>
+                          ✅ Delivery available · {pincodeInfo.estimatedDays} days
+                        </span>
+                      )}
+                      {pincodeInfo && !pincodeInfo.serviceable && (
+                        <span style={{ fontSize: '12px', color: '#ff4444', marginTop: '4px' }}>
+                          ❌ Not serviceable at this pincode
+                        </span>
+                      )}
                     </div>
                     <div className="form-group">
                       <label>Landmark</label>
@@ -723,14 +775,14 @@ const applyCouponDirect = async (code) => {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="form-actions">
-                    <button type="submit" className="save-address-btn">
+                    <button type="submit" className="save-address-btn" disabled={pincodeChecking || (pincodeInfo && !pincodeInfo.serviceable)}>
                       {isEditingAddress ? '💾 Update Address' : '✅ Use This Address'}
                     </button>
                     {(isLoggedIn && savedAddresses.length > 0) && (
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="cancel-address-btn"
                         onClick={() => { setShowAddressForm(false); setIsEditingAddress(false); }}
                       >
@@ -777,10 +829,8 @@ const applyCouponDirect = async (code) => {
 
           {/* Right Column - Coupon + Order Summary + Payment */}
           <div className="checkout-right">
-            
-            {/* ============================================ */}
-            {/* ✅ COUPON SECTION - ABOVE ORDER SUMMARY */}
-            {/* ============================================ */}
+
+            {/* Coupon Section */}
             <div className="checkout-section coupon-section">
               <div style={{ display: 'flex', gap: '10px' }}>
                 <input
@@ -836,7 +886,6 @@ const applyCouponDirect = async (code) => {
                 )}
               </div>
 
-              {/* Success/Error Messages */}
               {couponSuccess && (
                 <div style={{ marginTop: '10px', color: '#28a745', fontSize: '13px' }}>
                   ✅ {couponSuccess}
@@ -848,7 +897,6 @@ const applyCouponDirect = async (code) => {
                 </div>
               )}
 
-              {/* ✅ AVAILABLE COUPONS - Expandable Horizontal Chips */}
               {availableCoupons.length > 0 && !couponDiscount && (
                 <div style={{ marginTop: '12px' }}>
                   <button
@@ -865,7 +913,7 @@ const applyCouponDirect = async (code) => {
                       gap: '6px'
                     }}
                   >
-                    <span style={{ 
+                    <span style={{
                       display: 'inline-block',
                       transition: 'transform 0.3s ease',
                       transform: showAvailableCoupons ? 'rotate(90deg)' : 'rotate(0deg)'
@@ -880,9 +928,9 @@ const applyCouponDirect = async (code) => {
 
                   {showAvailableCoupons && (
                     <div style={{ marginTop: '10px' }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        gap: '10px', 
+                      <div style={{
+                        display: 'flex',
+                        gap: '10px',
                         overflowX: 'auto',
                         padding: '4px 0 12px',
                         scrollbarWidth: 'thin',
@@ -924,7 +972,7 @@ const applyCouponDirect = async (code) => {
                               {coupon.code}
                             </span>
                             <span style={{ color: '#28a745', fontWeight: 'bold', fontSize: '13px' }}>
-                              {coupon.discountType === 'percentage' 
+                              {coupon.discountType === 'percentage'
                                 ? `${coupon.discountValue}% OFF`
                                 : `₹${coupon.discountValue} OFF`
                               }
@@ -955,11 +1003,10 @@ const applyCouponDirect = async (code) => {
                 </div>
               )}
 
-              {/* No Coupons Available */}
               {availableCoupons.length === 0 && !couponDiscount && (
-                <div style={{ 
-                  marginTop: '12px', 
-                  fontSize: '12px', 
+                <div style={{
+                  marginTop: '12px',
+                  fontSize: '12px',
                   color: '#666',
                   textAlign: 'center',
                   padding: '4px 0'
@@ -969,9 +1016,7 @@ const applyCouponDirect = async (code) => {
               )}
             </div>
 
-            {/* ============================================ */}
-            {/* ✅ ORDER SUMMARY */}
-            {/* ============================================ */}
+            {/* Order Summary */}
             <div className="checkout-section summary-section">
               <div className="section-header">
                 <h3>💰 Order Summary</h3>
@@ -982,7 +1027,7 @@ const applyCouponDirect = async (code) => {
                   <span>Item Total ({cart.reduce((sum, item) => sum + (item.quantity || 1), 0)} items)</span>
                   <span>₹{subtotal}</span>
                 </div>
-                
+
                 <div className="summary-row">
                   <span>🚚 Shipping</span>
                   {shippingFee === 0 ? (
@@ -991,18 +1036,17 @@ const applyCouponDirect = async (code) => {
                     <span>₹{shippingFee}</span>
                   )}
                 </div>
-                
+
                 <div className="summary-row">
                   <span>✨ Platform Fee</span>
                   <span style={{ color: '#28a745', fontWeight: 'bold' }}>FREE</span>
                 </div>
-                
+
                 <div className="summary-row">
                   <span>💫 Handling Fee</span>
                   <span style={{ color: '#28a745', fontWeight: 'bold' }}>FREE</span>
                 </div>
 
-                {/* Coupon Discount - Shows when applied */}
                 {couponDiscount > 0 && (
                   <div className="summary-row" style={{ color: '#28a745' }}>
                     <span>🎟️ Coupon ({appliedCoupon?.code || 'Applied'})</span>
@@ -1011,7 +1055,7 @@ const applyCouponDirect = async (code) => {
                 )}
 
                 <div className="summary-divider"></div>
-                
+
                 <div className="summary-row total" style={{ fontSize: '20px' }}>
                   <span><strong>Total</strong></span>
                   <span style={{ color: '#D4AF37', fontWeight: 'bold' }}>
@@ -1021,15 +1065,13 @@ const applyCouponDirect = async (code) => {
               </div>
             </div>
 
-            {/* ============================================ */}
-            {/* ✅ PAYMENT SECTION */}
-            {/* ============================================ */}
+            {/* Payment Section */}
             <div className="checkout-section payment-section">
               <button
                 className="pay-btn razorpay-btn"
                 onClick={initiateRazorpayPayment}
-                disabled={!selectedAddress || processing}
-                style={{ 
+                disabled={!selectedAddress || processing || (pincodeInfo && !pincodeInfo.serviceable)}
+                style={{
                   width: '100%',
                   padding: '14px',
                   background: 'linear-gradient(135deg, #D4AF37, #FFB7C5)',
@@ -1039,17 +1081,23 @@ const applyCouponDirect = async (code) => {
                   fontSize: '16px',
                   fontWeight: 'bold',
                   cursor: 'pointer',
-                  opacity: (!selectedAddress || processing) ? 0.6 : 1
+                  opacity: (!selectedAddress || processing || (pincodeInfo && !pincodeInfo.serviceable)) ? 0.6 : 1
                 }}
               >
                 {processing ? '⏳ Processing...' : `Pay ₹${finalTotal}`}
               </button>
 
+              {pincodeInfo && !pincodeInfo.serviceable && (
+                <p style={{ marginTop: '8px', fontSize: '12px', color: '#ff4444', textAlign: 'center' }}>
+                  ⚠️ Cannot proceed — pincode not serviceable
+                </p>
+              )}
+
               {processing && (
                 <div style={{ textAlign: 'center', marginTop: '12px' }}>
-                  <div style={{ 
-                    width: '30px', 
-                    height: '30px', 
+                  <div style={{
+                    width: '30px',
+                    height: '30px',
                     border: '3px solid #333',
                     borderTop: '3px solid #D4AF37',
                     borderRadius: '50%',

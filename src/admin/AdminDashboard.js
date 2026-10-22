@@ -11,10 +11,11 @@ import NotificationsPanel from './NotificationsPanel';
 import ReferralPanel from './ReferralPanel';
 import CategoriesPanel from './CategoriesPanel';
 import AnalyticsPanel from './AnalyticsPanel';
-import MarketingPanel from './MarketingPanel';  // ✅ NEW
+import MarketingPanel from './MarketingPanel';
+import ShiprocketWidget from '../components/ShiprocketWidget';
 import axios from 'axios';
 import './Admin.css';
-import './MarketingPanel.css';  // ✅ NEW
+import './MarketingPanel.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
@@ -34,33 +35,31 @@ function AdminDashboard() {
   const [authError, setAuthError] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // ✅ FIX: Single authentication check with no redirect loop
   useEffect(() => {
     const checkAuth = () => {
       const loggedIn = localStorage.getItem('admin_logged_in');
       const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
-      
+
       console.log('🔍 Checking auth - loggedIn:', loggedIn, 'token:', token ? 'exists' : 'null');
-      
+
       if (loggedIn === 'true' && token) {
         setIsAuthenticated(true);
         fetchStats();
       } else {
         console.log('❌ Not authenticated, redirecting to login...');
         setIsAuthenticated(false);
-        // ✅ Use window.location.replace to prevent back button issues
         window.location.replace('/admin');
       }
     };
-    
+
     checkAuth();
-  }, []); // ✅ Empty dependency array - runs only once
+  }, []);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
     return {
-      headers: { 
-        Authorization: `Bearer ${token}` 
+      headers: {
+        Authorization: `Bearer ${token}`
       }
     };
   };
@@ -70,7 +69,7 @@ function AdminDashboard() {
     setAuthError(false);
     try {
       const authHeaders = getAuthHeaders();
-      
+
       const [productsRes, ordersRes, usersRes, bannersRes, reviewsRes, notificationsRes] = await Promise.all([
         axios.get(`${API_URL}/api/products`),
         axios.get(`${API_URL}/api/orders`, authHeaders).catch(() => ({ data: [] })),
@@ -79,12 +78,12 @@ function AdminDashboard() {
         axios.get(`${API_URL}/api/reviews/admin/all`, authHeaders).catch(() => ({ data: [] })),
         axios.get(`${API_URL}/api/notifications/admin`, authHeaders).catch(() => ({ data: [] }))
       ]);
-      
+
       const products = productsRes.data || [];
       const orders = ordersRes.data || [];
       const reviews = reviewsRes.data || [];
       const notifications = notificationsRes.data || [];
-      
+
       setStats({
         totalProducts: products.length,
         totalOrders: orders.length,
@@ -97,7 +96,7 @@ function AdminDashboard() {
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
-      
+
       if (error.response?.status === 401 || error.response?.status === 403) {
         console.log('Authentication failed, redirecting to login...');
         setAuthError(true);
@@ -122,7 +121,6 @@ function AdminDashboard() {
     window.location.replace('/admin');
   };
 
-  // ✅ If not authenticated, show nothing (redirect will happen)
   if (!isAuthenticated && !authError) {
     return (
       <div className="admin-dashboard">
@@ -200,7 +198,6 @@ function AdminDashboard() {
           <button className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setActiveTab('analytics')}>
             📈 Analytics
           </button>
-          {/* ✅ NEW: Marketing Button */}
           <button className={activeTab === 'marketing' ? 'active' : ''} onClick={() => setActiveTab('marketing')}>
             📊 Marketing
           </button>
@@ -222,6 +219,9 @@ function AdminDashboard() {
               <div className="stat-card"><h3>{stats.totalReviews}</h3><p>Reviews</p></div>
               <div className="stat-card"><h3>{stats.totalNotifications}</h3><p>Notifications</p></div>
             </div>
+
+            {/* Shiprocket Widget */}
+            <ShiprocketWidget />
           </div>
         )}
 
@@ -237,7 +237,6 @@ function AdminDashboard() {
         {activeTab === 'referral' && <ReferralPanel />}
         {activeTab === 'categories' && <CategoriesPanel />}
         {activeTab === 'analytics' && <AnalyticsPanel />}
-        {/* ✅ NEW: Marketing Panel */}
         {activeTab === 'marketing' && <MarketingPanel />}
       </div>
     </div>

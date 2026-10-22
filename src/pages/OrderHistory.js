@@ -22,8 +22,9 @@ function OrderHistory({ user, isLoggedIn }) {
   const [ratingComment, setRatingComment] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [contactLoading, setContactLoading] = useState(true);
-  
-  // ✅ Review Modal State
+  const [trackingData, setTrackingData] = useState({});
+
+  // Review Modal State
   const [reviewModal, setReviewModal] = useState(null);
 
   // Fetch WhatsApp number
@@ -46,19 +47,20 @@ function OrderHistory({ user, isLoggedIn }) {
   // Memoized filtered and sorted orders
   const filteredOrders = useMemo(() => {
     let result = [...orders];
-    
+
     if (statusFilter !== 'all') {
       result = result.filter(o => o.status === statusFilter);
     }
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(o => 
+      result = result.filter(o =>
         o.orderId?.toLowerCase().includes(term) ||
-        o.items?.some(i => i.name?.toLowerCase().includes(term))
+        o.items?.some(i => i.name?.toLowerCase().includes(term)) ||
+        o.shiprocket?.awbCode?.toLowerCase().includes(term)
       );
     }
-    
+
     result.sort((a, b) => {
       switch (sortBy) {
         case 'oldest': return new Date(a.createdAt) - new Date(b.createdAt);
@@ -67,7 +69,7 @@ function OrderHistory({ user, isLoggedIn }) {
         default: return new Date(b.createdAt) - new Date(a.createdAt);
       }
     });
-    
+
     return result;
   }, [orders, statusFilter, searchTerm, sortBy]);
 
@@ -93,31 +95,28 @@ function OrderHistory({ user, isLoggedIn }) {
   useEffect(() => {
     const token = localStorage.getItem('loop_token');
     const userData = localStorage.getItem('loop_user');
-    
+
     if (!token || !userData) {
       setError('Please login to view your orders');
       setLoading(false);
       return;
     }
-    
+
     fetchOrders();
   }, []);
 
-  // ✅ NEW: Scroll to and highlight specific order from URL
+  // Scroll to and highlight specific order from URL
   useEffect(() => {
-    // Check if we're navigating to a specific order
     const pathParts = location.pathname.split('/');
     const orderIdFromUrl = pathParts[pathParts.length - 1];
-    
+
     if (orderIdFromUrl && orderIdFromUrl !== 'orders' && orders.length > 0) {
-      // Wait for orders to load, then scroll to the order
       const timer = setTimeout(() => {
         const orderElement = document.getElementById(`order-${orderIdFromUrl}`);
         if (orderElement) {
           orderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
           orderElement.style.border = '2px solid #D4AF37';
           orderElement.style.boxShadow = '0 0 30px rgba(212, 175, 55, 0.2)';
-          // Remove highlight after 5 seconds
           setTimeout(() => {
             orderElement.style.border = '';
             orderElement.style.boxShadow = '';
@@ -163,7 +162,7 @@ function OrderHistory({ user, isLoggedIn }) {
       size: item.size || 'M',
       image: item.productId?.image || ''
     }));
-    
+
     const existingCart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
     const newCart = [...existingCart, ...cartItems];
     localStorage.setItem('loop_cart', JSON.stringify(newCart));
@@ -186,9 +185,48 @@ function OrderHistory({ user, isLoggedIn }) {
     window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // ✅ Open Review Modal
+  // ============================================
+  // TRACKING & REFUND
+  // ============================================
+  const openLiveTracking = (order) => {
+    if (order.tracking?.url) {
+      window.open(order.tracking.url, '_blank');
+    } else if (order.shiprocket?.awbCode) {
+      window.open(`https://shiprocket.co/tracking/${order.shiprocket.awbCode}`, '_blank');
+    } else {
+      alert('Tracking not available yet');
+    }
+  };
+
+  const requestRefund = async (order) => {
+    const method = window.prompt(
+      'Refund method?\nType "wallet" for instant store credit\nType "razorpay" for bank/card refund (3-5 days)',
+      'wallet'
+    );
+
+    if (!method || !['wallet', 'razorpay'].includes(method.toLowerCase())) {
+      if (method !== null) alert('Invalid choice. Please type "wallet" or "razorpay".');
+      return;
+    }
+
+    const reason = window.prompt('Reason for refund (optional):') || 'Customer request';
+
+    try {
+      const token = localStorage.getItem('loop_token');
+      const response = await axios.post(
+        `${API_URL}/api/orders/${order.orderId}/refund-request`,
+        { method: method.toLowerCase(), reason },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert(response.data.message || '✅ Refund requested');
+      fetchOrders();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Could not request refund');
+    }
+  };
+
+  // Open Review Modal
   const openReviewModal = (order) => {
-    // Find first un-reviewed item
     const unReviewedItem = order.items?.find(item => !item.isReviewed);
     if (unReviewedItem) {
       setReviewModal({
@@ -208,7 +246,7 @@ function OrderHistory({ user, isLoggedIn }) {
       alert('Please select a rating');
       return;
     }
-    
+
     try {
       const token = localStorage.getItem('loop_token');
       await axios.post(
@@ -216,7 +254,7 @@ function OrderHistory({ user, isLoggedIn }) {
         { rating, comment: ratingComment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       setShowRatingModal(false);
       setRating(0);
       setRatingComment('');
@@ -359,7 +397,7 @@ function OrderHistory({ user, isLoggedIn }) {
               </div>
 
               <div className="order-sort-wrapper">
-                <select 
+                <select
                   className="order-sort-select"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
@@ -376,7 +414,7 @@ function OrderHistory({ user, isLoggedIn }) {
               <span className="search-icon">🔍</span>
               <input
                 type="text"
-                placeholder="Search orders..."
+                placeholder="Search orders or AWB..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -390,7 +428,7 @@ function OrderHistory({ user, isLoggedIn }) {
                 <div className="no-orders-found">
                   <span>🔍</span>
                   <p>No orders match your search</p>
-                  <button 
+                  <button
                     className="clear-filters-btn"
                     onClick={() => {
                       setStatusFilter('all');
@@ -406,13 +444,17 @@ function OrderHistory({ user, isLoggedIn }) {
                   const isExpanded = selectedOrder === order._id;
                   const showRating = order.status === 'delivered' && !order.postOrderRating;
                   const isHighlighted = location.pathname.includes(order.orderId);
+                  const isDelivered = order.status === 'delivered';
+                  const isPaid = order.paymentStatus === 'paid';
+                  const canRefund = isDelivered && isPaid &&
+                    (!order.refund?.status || order.refund.status === 'none');
 
                   return (
-                    <div 
-                      key={order._id} 
-                      id={`order-${order.orderId}`}  // ✅ Add ID for scrolling
+                    <div
+                      key={order._id}
+                      id={`order-${order.orderId}`}
                       className={`order-card ${isExpanded ? 'expanded' : ''} ${isHighlighted ? 'highlighted' : ''}`}
-                      style={{ 
+                      style={{
                         animationDelay: `${index * 0.05}s`,
                         ...(isHighlighted && {
                           border: '2px solid #D4AF37',
@@ -429,13 +471,13 @@ function OrderHistory({ user, isLoggedIn }) {
                           )}
                         </div>
                         <div className="order-header-right">
-                          <span 
+                          <span
                             className="order-status"
                             style={{ color: getStatusColor(order.status) }}
                           >
                             {getStatusIcon(order.status)} {getStatusLabel(order.status)}
                           </span>
-                          <button 
+                          <button
                             className="order-toggle-btn"
                             onClick={() => toggleOrderDetails(order._id)}
                             aria-expanded={isExpanded}
@@ -450,7 +492,7 @@ function OrderHistory({ user, isLoggedIn }) {
                           const productId = item.productId?._id || item.productId;
                           return (
                             <div key={idx} className="order-item-preview">
-                              <div 
+                              <div
                                 className="item-preview-image clickable"
                                 onClick={() => goToProduct(productId)}
                                 style={{ cursor: 'pointer' }}
@@ -462,7 +504,7 @@ function OrderHistory({ user, isLoggedIn }) {
                                 )}
                               </div>
                               <div className="item-preview-details">
-                                <span 
+                                <span
                                   className="item-preview-name clickable"
                                   onClick={() => goToProduct(productId)}
                                   style={{ cursor: 'pointer', color: '#D4AF37' }}
@@ -486,7 +528,6 @@ function OrderHistory({ user, isLoggedIn }) {
                         )}
                       </div>
 
-                      {/* ✅ ORDER FOOTER - WITH REVIEW BUTTON */}
                       <div className="order-footer">
                         <div className="order-total">
                           <span className="total-label">Total:</span>
@@ -498,13 +539,13 @@ function OrderHistory({ user, isLoggedIn }) {
                         <div className="order-actions-bar">
                           {order.status === 'delivered' && (
                             <>
-                              <button 
+                              <button
                                 className="order-action-btn reorder"
                                 onClick={() => handleReorder(order)}
                               >
                                 🔄 Reorder
                               </button>
-                              <button 
+                              <button
                                 className="order-action-btn rate"
                                 onClick={() => {
                                   setRatingOrder(order);
@@ -513,9 +554,8 @@ function OrderHistory({ user, isLoggedIn }) {
                               >
                                 ⭐ Rate
                               </button>
-                              {/* ✅ Write Review Button - Only if there are un-reviewed items */}
                               {order.items?.some(item => !item.isReviewed) && (
-                                <button 
+                                <button
                                   className="order-action-btn rate"
                                   onClick={() => openReviewModal(order)}
                                   style={{ background: '#D4AF37', color: '#000', border: 'none' }}
@@ -523,15 +563,45 @@ function OrderHistory({ user, isLoggedIn }) {
                                   ✏️ Write Review
                                 </button>
                               )}
+                              {(order.tracking?.url || order.shiprocket?.awbCode) && (
+                                <button
+                                  className="order-action-btn"
+                                  onClick={() => openLiveTracking(order)}
+                                  style={{ color: '#0066FF' }}
+                                >
+                                  🚚 Track Live
+                                </button>
+                              )}
+                              {canRefund && (
+                                <button
+                                  className="order-action-btn"
+                                  onClick={() => requestRefund(order)}
+                                  style={{ color: '#8B5CF6' }}
+                                >
+                                  💸 Refund
+                                </button>
+                              )}
+                              {order.refund?.status === 'completed' && (
+                                <span style={{ color: '#28a745', fontSize: '12px', fontWeight: '600' }}>
+                                  ✅ Refunded via {order.refund.method}
+                                </span>
+                              )}
                             </>
+                          )}
+                          {order.status === 'shipped' && (order.tracking?.url || order.shiprocket?.awbCode) && (
+                            <button
+                              className="order-action-btn"
+                              onClick={() => openLiveTracking(order)}
+                              style={{ color: '#0066FF' }}
+                            >
+                              🚚 Track Live
+                            </button>
                           )}
                         </div>
                       </div>
 
-                      {/* EXPANDED ORDER DETAILS */}
                       {isExpanded && (
                         <div className="order-expanded">
-                          {/* Full Items List */}
                           <div className="order-items-full">
                             <h4>🛍️ Items</h4>
                             {order.items?.map((item, idx) => {
@@ -539,7 +609,7 @@ function OrderHistory({ user, isLoggedIn }) {
                               return (
                                 <div key={idx} className="order-item-full">
                                   <div className="item-full-info">
-                                    <span 
+                                    <span
                                       className="item-full-name clickable"
                                       onClick={() => goToProduct(productId)}
                                       style={{ cursor: 'pointer', color: '#D4AF37' }}
@@ -561,15 +631,14 @@ function OrderHistory({ user, isLoggedIn }) {
                             })}
                           </div>
 
-                          {/* Order Breakdown */}
                           <div className="order-breakdown">
                             <h4>💰 Order Breakdown</h4>
-                            
+
                             <div className="breakdown-row">
                               <span>Subtotal ({order.items?.length || 0} items)</span>
                               <span>₹{order.subtotal || 0}</span>
                             </div>
-                            
+
                             <div className="breakdown-row">
                               <span>🚚 Shipping Fee</span>
                               {order.shipping === 0 ? (
@@ -578,17 +647,17 @@ function OrderHistory({ user, isLoggedIn }) {
                                 <span>₹{order.shipping || 0}</span>
                               )}
                             </div>
-                            
+
                             <div className="breakdown-row">
                               <span>✨ Platform Fee</span>
                               <span className="free-badge platform">FREE</span>
                             </div>
-                            
+
                             <div className="breakdown-row">
                               <span>💫 Handling Fee</span>
                               <span className="free-badge handling">FREE</span>
                             </div>
-                            
+
                             {order.discount > 0 && (
                               <div className="breakdown-row discount">
                                 <span>🎟️ Coupon Discount</span>
@@ -608,7 +677,6 @@ function OrderHistory({ user, isLoggedIn }) {
                             </div>
                           </div>
 
-                          {/* Timeline */}
                           {order.timeline && order.timeline.length > 0 && (
                             <div className="order-timeline">
                               <h4>📋 Order Timeline</h4>
@@ -623,7 +691,6 @@ function OrderHistory({ user, isLoggedIn }) {
                             </div>
                           )}
 
-                          {/* Tracking Info */}
                           {order.tracking?.number && (
                             <div className="order-tracking">
                               <span className="tracking-icon">📦</span>
@@ -639,11 +706,27 @@ function OrderHistory({ user, isLoggedIn }) {
                             </div>
                           )}
 
-                          {/* Rating Reminder */}
+                          {order.shiprocket?.scans && order.shiprocket.scans.length > 0 && (
+                            <div className="order-timeline" style={{ marginTop: '16px' }}>
+                              <h4>📦 Shipment Tracking</h4>
+                              {order.shiprocket.scans.map((scan, idx) => (
+                                <div key={idx} className="timeline-item">
+                                  <span className="timeline-status">📍 {scan.location || 'Transit'}</span>
+                                  <span className="timeline-date">
+                                    {new Date(scan.date).toLocaleString('en-IN', {
+                                      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                                    })}
+                                  </span>
+                                  <span className="timeline-desc" style={{ flex: 2 }}>{scan.activity}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           {showRating && (
                             <div className="rating-reminder">
                               <span>⭐ Love your items? Rate them! </span>
-                              <button 
+                              <button
                                 className="rate-now-btn"
                                 onClick={() => {
                                   setRatingOrder(order);
@@ -655,7 +738,6 @@ function OrderHistory({ user, isLoggedIn }) {
                             </div>
                           )}
 
-                          {/* WhatsApp Help */}
                           {whatsappNumber && (
                             <div className="order-whatsapp-help">
                               <button
@@ -684,7 +766,7 @@ function OrderHistory({ user, isLoggedIn }) {
             <button className="rating-modal-close" onClick={() => setShowRatingModal(false)}>✕</button>
             <h3>⭐ Rate Your Order</h3>
             <p className="rating-modal-subtitle">{ratingOrder.orderId}</p>
-            
+
             <div className="rating-stars">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -724,9 +806,9 @@ function OrderHistory({ user, isLoggedIn }) {
         </div>
       )}
 
-      {/* ✅ Review Modal */}
+      {/* Review Modal */}
       {reviewModal && (
-        <ReviewModal 
+        <ReviewModal
           isOpen={!!reviewModal}
           onClose={() => setReviewModal(null)}
           productId={reviewModal.productId}

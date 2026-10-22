@@ -9,6 +9,7 @@ import ReviewModal from '../components/ReviewModal';
 import StockWarning, { VariantStockWarning } from '../components/StockWarning';
 import WhatsAppIcon from '../components/WhatsAppIcon';
 import FAQSection from '../components/FAQSection';
+import PincodeChecker from '../components/PincodeChecker';
 import './ProductPage.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
@@ -47,10 +48,10 @@ const getVideoEmbedUrl = (url) => {
 // Media Renderer Component
 const MediaRenderer = ({ media, className, isFullscreen = false }) => {
   const isVideo = isVideoUrl(media);
-  
+
   if (isVideo) {
     const embedUrl = getVideoEmbedUrl(media);
-    
+
     if (embedUrl.includes('youtube.com/embed') || embedUrl.includes('player.vimeo.com')) {
       return (
         <iframe
@@ -104,8 +105,8 @@ const MediaRenderer = ({ media, className, isFullscreen = false }) => {
 // Animation variants
 const fadeInUp = {
   hidden: { opacity: 0, y: 30 },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
     transition: { duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }
   }
@@ -133,21 +134,21 @@ const createRipple = (e) => {
   setTimeout(() => ripple.remove(), 600);
 };
 
-function ProductPage({ 
-  addToCart, 
-  cart, 
-  setShowCart, 
-  updateQuantity, 
+function ProductPage({
+  addToCart,
+  cart,
+  setShowCart,
+  updateQuantity,
   removeFromCart,
   wishlist: globalWishlist,
   toggleWishlist: globalToggleWishlist,
   setCartAnimation,
-  addToRecentlyViewed 
+  addToRecentlyViewed
 }) {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { isDarkMode, user } = useApp();
-  
+
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState('');
@@ -174,7 +175,7 @@ function ProductPage({
   const [toastType, setToastType] = useState('success');
   const [localWishlist, setLocalWishlist] = useState([]);
   const [whatsappNumber, setWhatsappNumber] = useState('');
-  
+
   // Review states
   const [reviews, setReviews] = useState([]);
   const [reviewStats, setReviewStats] = useState({ average: 0, total: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } });
@@ -183,7 +184,7 @@ function ProductPage({
   const [reviewOrderId, setReviewOrderId] = useState(null);
   const [reviewOrderItemId, setReviewOrderItemId] = useState(null);
   const [reviewLoading, setReviewLoading] = useState(false);
-  
+
   const imageRef = useRef(null);
   const modalRef = useRef(null);
   const modalImageRef = useRef(null);
@@ -223,7 +224,7 @@ function ProductPage({
   const allMedia = (() => {
     if (!product) return [];
     const media = [];
-    
+
     if (product.image) media.push(product.image);
     if (product.images && product.images.length > 0) {
       product.images.forEach(img => {
@@ -252,7 +253,7 @@ function ProductPage({
         `${API_URL}/api/reviews/can-review/${product._id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
+
       if (response.data.canReview) {
         setCanReview(true);
         if (response.data.reviewableItems && response.data.reviewableItems.length > 0) {
@@ -297,12 +298,12 @@ function ProductPage({
     if (!product || !product.variants || product.variants.length === 0) {
       return { price: product?.price || 0, stock: product?.stock || 0 };
     }
-    
+
     let totalPrice = 0;
     let stock = 0;
-    
+
     product.variants.forEach(variant => {
-      const selectedOpt = variant.options.find(opt => 
+      const selectedOpt = variant.options.find(opt =>
         opt.value === selectedVariant[variant.type || variant.name]
       );
       if (selectedOpt) {
@@ -310,15 +311,15 @@ function ProductPage({
         stock = selectedOpt.stock || 0;
       }
     });
-    
+
     return { price: product.price + totalPrice, stock };
   };
 
   const variantDetails = getSelectedVariantDetails();
-  const displayPrice = product?.salePrice && product.salePrice < product.price 
-    ? product.salePrice 
+  const displayPrice = product?.salePrice && product.salePrice < product.price
+    ? product.salePrice
     : variantDetails.price || product?.price || 0;
-  
+
   const isVariantOutOfStock = variantDetails.stock === 0;
   const availableStock = variantDetails.stock || product?.stock || 0;
 
@@ -396,21 +397,21 @@ function ProductPage({
 
       setLoading(true);
       setError('');
-      
+
       try {
         const response = await axios.get(`${API_URL}/api/products/${slug}`);
-        
+
         if (response.data) {
           setProduct(response.data);
           setSelectedImage(response.data.image || '');
-          
+
           const savedSize = localStorage.getItem(`loop_size_${slug}`);
           if (savedSize) {
             setSelectedSize(savedSize);
           } else if (response.data.size) {
             setSelectedSize(response.data.size);
           }
-          
+
           if (response.data.variants && response.data.variants.length > 0) {
             const defaultVariant = {};
             response.data.variants.forEach(variant => {
@@ -420,12 +421,12 @@ function ProductPage({
             });
             setSelectedVariant(defaultVariant);
           }
-          
+
           const cartItem = cart.find(item => item.id === response.data._id);
           if (cartItem) {
             setQuantity(cartItem.quantity);
           }
-          
+
           const allProducts = await axios.get(`${API_URL}/api/products`);
           const similar = allProducts.data
             .filter(p => p._id !== response.data._id && p.category === response.data.category)
@@ -438,7 +439,7 @@ function ProductPage({
         console.log('Error fetching product:', err);
         setError('Product not found');
       }
-      
+
       setLoading(false);
     };
 
@@ -512,14 +513,14 @@ function ProductPage({
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (!isFullscreen) return;
-      
+
       if (e.key === 'ArrowLeft') {
         goToPrevious();
       } else if (e.key === 'ArrowRight') {
         goToNext();
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen]);
@@ -571,7 +572,7 @@ function ProductPage({
     }));
   };
 
-  // ✅ Updated: Handle quantity change with stock limit
+  // Handle quantity change with stock limit
   const handleQuantityChange = (newQuantity) => {
     if (newQuantity < 1) {
       if (product && isInCart) {
@@ -581,19 +582,18 @@ function ProductPage({
       }
       return;
     }
-    
-    // ✅ Check stock limit
+
     if (newQuantity > availableStock) {
       showToastMessage(`⚠️ Only ${availableStock} items available in stock!`, 'warning');
       return;
     }
-    
+
     setQuantity(newQuantity);
-    
+
     if (quantityTimeoutRef.current) {
       clearTimeout(quantityTimeoutRef.current);
     }
-    
+
     quantityTimeoutRef.current = setTimeout(() => {
       if (product) {
         if (isInCart) {
@@ -601,7 +601,7 @@ function ProductPage({
         } else if (newQuantity > 0) {
           addToCart(product, null, newQuantity);
           showToastMessage(`✅ Added ${newQuantity} × ${product.name} to cart!`, 'success');
-          
+
           if (setCartAnimation) {
             setCartAnimation(true);
             setTimeout(() => {
@@ -616,7 +616,6 @@ function ProductPage({
   const handleAddToCart = () => {
     if (!product) return;
 
-    // ✅ Check stock before adding
     if (quantity > availableStock) {
       showToastMessage(`⚠️ Only ${availableStock} items available!`, 'warning');
       return;
@@ -633,7 +632,7 @@ function ProductPage({
       addToCart(product, null, quantity);
       showToastMessage(`✅ Added ${quantity} × ${product.name} to cart!`, 'success');
     }
-    
+
     if (setCartAnimation) {
       setCartAnimation(true);
       setTimeout(() => {
@@ -649,7 +648,6 @@ function ProductPage({
   const handleBuyNow = () => {
     if (!product) return;
 
-    // ✅ Check stock before buying
     if (quantity > availableStock) {
       showToastMessage(`⚠️ Only ${availableStock} items available!`, 'warning');
       return;
@@ -675,10 +673,10 @@ function ProductPage({
 
   const toggleWishlistWithHeart = (productId, e) => {
     if (e) e.stopPropagation();
-    
+
     const isAdding = !wishlist.includes(productId);
     toggleWishlist(productId);
-    
+
     if (isAdding) {
       showToastMessage('❤️ Added to wishlist!', 'success');
       if (e) {
@@ -692,7 +690,7 @@ function ProductPage({
             heartEl.style.top = `${rect.top + (Math.random() - 0.5) * 20}px`;
             heartEl.style.fontSize = `${20 + Math.random() * 20}px`;
             document.body.appendChild(heartEl);
-            
+
             setTimeout(() => {
               heartEl.remove();
             }, 1500);
@@ -731,19 +729,19 @@ function ProductPage({
   const handleTouchEnd = () => {
     const diffX = touchStartX - touchEndX;
     const diffY = touchStartY - touchEndY;
-    
+
     if (isFullscreen && Math.abs(diffY) > Math.abs(diffX) && diffY > 50) {
       closeFullscreen();
       return;
     }
-    
+
     if (Math.abs(diffX) > 50) {
       if (diffX > 0) {
-        setCurrentMediaIndex((prev) => 
+        setCurrentMediaIndex((prev) =>
           prev < allMedia.length - 1 ? prev + 1 : prev
         );
       } else {
-        setCurrentMediaIndex((prev) => 
+        setCurrentMediaIndex((prev) =>
           prev > 0 ? prev - 1 : prev
         );
       }
@@ -790,23 +788,23 @@ function ProductPage({
 
   const handleModalTouchEnd = () => {
     setIsPinching(false);
-    
+
     if (scale === 1) {
       const diffX = touchStartX - touchEndX;
       const diffY = touchStartY - touchEndY;
-      
+
       if (Math.abs(diffY) > Math.abs(diffX) && diffY > 50) {
         closeFullscreen();
         return;
       }
-      
+
       if (Math.abs(diffX) > 50) {
         if (diffX > 0) {
-          setFullscreenIndex((prev) => 
+          setFullscreenIndex((prev) =>
             prev < allMedia.length - 1 ? prev + 1 : prev
           );
         } else {
-          setFullscreenIndex((prev) => 
+          setFullscreenIndex((prev) =>
             prev > 0 ? prev - 1 : prev
           );
         }
@@ -839,15 +837,15 @@ function ProductPage({
   const trackProductView = async () => {
     try {
       if (!product) return;
-      
-      const visitorId = localStorage.getItem('loop_visitor_id') || 
+
+      const visitorId = localStorage.getItem('loop_visitor_id') ||
                        sessionStorage.getItem('loop_session_id');
-      
+
       const viewedProducts = JSON.parse(sessionStorage.getItem('viewed_products') || '[]');
       if (!viewedProducts.includes(product._id)) {
         viewedProducts.push(product._id);
         sessionStorage.setItem('viewed_products', JSON.stringify(viewedProducts));
-        
+
         let userId = null;
         const token = localStorage.getItem('loop_token');
         if (token) {
@@ -858,7 +856,7 @@ function ProductPage({
             userId = userRes.data?._id;
           } catch (e) {}
         }
-        
+
         await axios.post(`${API_URL}/api/analytics/track/product-view`, {
           productId: product._id,
           visitorId: visitorId || 'unknown',
@@ -884,7 +882,7 @@ function ProductPage({
   // Loading state
   if (loading) {
     return (
-      <motion.div 
+      <motion.div
         className="product-loading"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -900,7 +898,7 @@ function ProductPage({
   // Error state
   if (error || !product) {
     return (
-      <motion.div 
+      <motion.div
         className="product-error"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -922,11 +920,11 @@ function ProductPage({
   const totalSold = product.totalSold || 0;
 
   // Get unique sizes and colors from variants
-  const uniqueSizes = product.variants && product.variants.length > 0 
+  const uniqueSizes = product.variants && product.variants.length > 0
     ? product.variants.find(v => v.type === 'Size' || v.name === 'Size')?.options.map(o => o.value) || []
     : [product.size || 'M'];
-  
-  const uniqueColors = product.variants && product.variants.length > 0 
+
+  const uniqueColors = product.variants && product.variants.length > 0
     ? product.variants.find(v => v.type === 'Color' || v.name === 'Color')?.options.map(o => o.value) || []
     : [product.color || 'Black'];
 
@@ -946,8 +944,8 @@ function ProductPage({
       "@type": "Offer",
       "priceCurrency": "INR",
       "price": hasSale ? product.salePrice : product.price,
-      "availability": product.stock > 0 ? 
-        "https://schema.org/InStock" : 
+      "availability": product.stock > 0 ?
+        "https://schema.org/InStock" :
         "https://schema.org/OutOfStock"
     }
   };
@@ -961,9 +959,9 @@ function ProductPage({
   }
 
   return (
-    <div 
-      className="product-page" 
-      style={{ 
+    <div
+      className="product-page"
+      style={{
         background: themeStyles.background,
         color: themeStyles.color,
         minHeight: '100vh',
@@ -992,12 +990,12 @@ function ProductPage({
       </Helmet>
 
       {/* Toast Notification */}
-      <motion.div 
+      <motion.div
         className={`toast-notification ${showToast ? 'show' : ''} ${toastType}`}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: showToast ? 1 : 0, y: showToast ? 0 : -20 }}
         transition={{ duration: 0.3 }}
-        style={{ 
+        style={{
           background: isDarkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.95)',
           color: themeStyles.color,
           borderColor: themeStyles.cardBorder
@@ -1039,7 +1037,7 @@ function ProductPage({
       )}
 
       {/* Review Modal */}
-      <ReviewModal 
+      <ReviewModal
         isOpen={showReviewModal}
         onClose={() => setShowReviewModal(false)}
         productId={product._id}
@@ -1054,7 +1052,7 @@ function ProductPage({
 
       <div className="container" style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 40px' }}>
         {/* Breadcrumb */}
-        <motion.div 
+        <motion.div
           className="breadcrumb"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1066,7 +1064,7 @@ function ProductPage({
           <span className="current" style={{ color: themeStyles.color }}>{product.name}</span>
         </motion.div>
 
-        <motion.div 
+        <motion.div
           className="product-layout"
           initial="hidden"
           animate="visible"
@@ -1074,19 +1072,19 @@ function ProductPage({
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', padding: '20px 0 40px' }}
         >
           {/* Left Column - Media */}
-          <motion.div 
+          <motion.div
             className="product-images-section"
             variants={fadeInUp}
             style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}
           >
-            <div 
+            <div
               className="main-image"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               ref={imageRef}
               onClick={() => openFullscreen(currentMediaIndex)}
-              style={{ 
+              style={{
                 position: 'relative',
                 background: isDarkMode ? '#1a1a1a' : '#f0e8ed',
                 borderRadius: '12px',
@@ -1095,11 +1093,11 @@ function ProductPage({
                 transition: 'box-shadow 0.3s ease'
               }}
             >
-              <MediaRenderer 
-                media={allMedia[currentMediaIndex] || allMedia[0]} 
+              <MediaRenderer
+                media={allMedia[currentMediaIndex] || allMedia[0]}
                 className="product-media"
               />
-              
+
               {/* Media type badge */}
               {allMedia[currentMediaIndex] && (
                 <div className="media-type-badge" style={{
@@ -1119,7 +1117,7 @@ function ProductPage({
                   {isVideoUrl(allMedia[currentMediaIndex]) ? '🎬 Video' : '📸 Image'}
                 </div>
               )}
-              
+
               {hasSale && (
                 <span className="sale-badge-big" style={{
                   position: 'absolute',
@@ -1136,8 +1134,8 @@ function ProductPage({
                   -{discountPercent}%
                 </span>
               )}
-              
-              <motion.button 
+
+              <motion.button
                 className={`wishlist-btn-image ${isInWishlist ? 'active' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1167,7 +1165,7 @@ function ProductPage({
               >
                 {isInWishlist ? '❤️' : '🤍'}
               </motion.button>
-              
+
               <div className="image-counter" style={{
                 position: 'absolute',
                 bottom: '60px',
@@ -1182,7 +1180,7 @@ function ProductPage({
               }}>
                 {currentMediaIndex + 1} / {allMedia.length}
               </div>
-              
+
               {showSwipeHint && allMedia.length > 1 && (
                 <div className="swipe-hint" style={{
                   position: 'absolute',
@@ -1202,7 +1200,7 @@ function ProductPage({
                   ← Swipe to browse →
                 </div>
               )}
-              
+
               <div className="swipe-dots" style={{
                 display: 'flex',
                 justifyContent: 'center',
@@ -1215,8 +1213,8 @@ function ProductPage({
                 zIndex: 5
               }}>
                 {allMedia.map((_, index) => (
-                  <span 
-                    key={index} 
+                  <span
+                    key={index}
                     className={`dot ${index === currentMediaIndex ? 'active' : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1234,7 +1232,7 @@ function ProductPage({
                 ))}
               </div>
             </div>
-            
+
             <div className="thumbnail-list" style={{
               display: 'flex',
               gap: '10px',
@@ -1246,7 +1244,7 @@ function ProductPage({
               {allMedia.map((media, index) => {
                 const isVideo = isVideoUrl(media);
                 const isActive = currentMediaIndex === index;
-                
+
                 return (
                   <div
                     key={index}
@@ -1275,7 +1273,7 @@ function ProductPage({
                     {isVideo ? (
                       <>
                         {media.includes('youtube.com') ? (
-                          <img 
+                          <img
                             src={`https://img.youtube.com/vi/${media.split('v=')[1]?.split('&')[0] || ''}/mqdefault.jpg`}
                             alt={`Video ${index + 1}`}
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -1284,7 +1282,7 @@ function ProductPage({
                             }}
                           />
                         ) : media.includes('youtu.be') ? (
-                          <img 
+                          <img
                             src={`https://img.youtube.com/vi/${media.split('/').pop().split('?')[0]}/mqdefault.jpg`}
                             alt={`Video ${index + 1}`}
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -1343,15 +1341,15 @@ function ProductPage({
           </motion.div>
 
           {/* Right Column - Product Details */}
-          <motion.div 
+          <motion.div
             className="product-details-section"
             variants={fadeInUp}
             style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
           >
-            <h1 className="product-title" style={{ 
-              fontSize: '28px', 
-              fontWeight: '700', 
-              margin: 0, 
+            <h1 className="product-title" style={{
+              fontSize: '28px',
+              fontWeight: '700',
+              margin: 0,
               lineHeight: '1.2',
               color: themeStyles.color
             }}>
@@ -1374,12 +1372,12 @@ function ProductPage({
               <RatingStars rating={reviewStats.average} totalReviews={reviewStats.total} />
             </div>
 
-            <div className="product-price" style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '15px', 
-              fontSize: '24px', 
-              padding: '10px 0' 
+            <div className="product-price" style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '15px',
+              fontSize: '24px',
+              padding: '10px 0'
             }}>
               {hasSale ? (
                 <>
@@ -1412,10 +1410,10 @@ function ProductPage({
               )}
             </div>
 
-            {/* ✅ Stock Warning - Updated */}
+            {/* Stock Warning */}
             <StockWarning stock={availableStock} />
 
-            {/* ✅ Quantity with Stock Limit */}
+            {/* Quantity with Stock Limit */}
             <div className="quantity-section" style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
               <label style={{ fontWeight: '500', fontSize: '14px', color: themeStyles.textSecondary }}>Quantity:</label>
               <div className="quantity-control" style={{
@@ -1427,8 +1425,8 @@ function ProductPage({
                 padding: '5px 15px',
                 border: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5'
               }}>
-                <motion.button 
-                  onClick={() => handleQuantityChange(displayQuantity - 1)} 
+                <motion.button
+                  onClick={() => handleQuantityChange(displayQuantity - 1)}
                   whileTap={{ scale: 0.8 }}
                   style={{
                     background: 'none',
@@ -1443,19 +1441,18 @@ function ProductPage({
                 <span style={{ fontSize: '18px', minWidth: '30px', textAlign: 'center', fontWeight: '600', color: themeStyles.color }}>
                   {displayQuantity}
                 </span>
-                <motion.button 
-                  onClick={() => handleQuantityChange(displayQuantity + 1)} 
+                <motion.button
+                  onClick={() => handleQuantityChange(displayQuantity + 1)}
                   whileTap={{ scale: 0.8 }}
                   style={{
                     background: 'none',
                     border: 'none',
                     color: themeStyles.color,
                     fontSize: '20px',
-                    cursor: 'pointer',
+                    cursor: displayQuantity >= availableStock ? 'not-allowed' : 'pointer',
                     padding: '5px 10px',
                     transition: 'all 0.3s ease',
-                    opacity: displayQuantity >= availableStock ? 0.4 : 1,
-                    cursor: displayQuantity >= availableStock ? 'not-allowed' : 'pointer'
+                    opacity: displayQuantity >= availableStock ? 0.4 : 1
                   }}
                   disabled={displayQuantity >= availableStock}
                 >+</motion.button>
@@ -1494,8 +1491,8 @@ function ProductPage({
             </div>
 
             <div className="action-buttons-main" style={{ display: 'flex', gap: '15px' }}>
-              <motion.button 
-                className="add-to-cart-btn" 
+              <motion.button
+                className="add-to-cart-btn"
                 onClick={(e) => {
                   createRipple(e);
                   handleAddToCart();
@@ -1524,8 +1521,8 @@ function ProductPage({
                   {availableStock === 0 ? 'Out of Stock' : (isInCart ? '🔄 Update Cart' : 'Add to Cart')}
                 </span>
               </motion.button>
-              <motion.button 
-                className="buy-now-btn" 
+              <motion.button
+                className="buy-now-btn"
                 onClick={handleBuyNow}
                 disabled={availableStock === 0}
                 style={{
@@ -1549,7 +1546,7 @@ function ProductPage({
             </div>
 
             <div className="action-buttons-secondary" style={{ display: 'flex', gap: '15px' }}>
-              <motion.button 
+              <motion.button
                 className={`wishlist-btn ${isInWishlist ? 'active' : ''}`}
                 onClick={(e) => toggleWishlistWithHeart(product._id, e)}
                 style={{
@@ -1567,8 +1564,8 @@ function ProductPage({
               >
                 {isInWishlist ? '❤️' : '🤍'} Wishlist
               </motion.button>
-              <motion.button 
-                className="share-btn" 
+              <motion.button
+                className="share-btn"
                 onClick={shareProduct}
                 style={{
                   flex: 1,
@@ -1587,6 +1584,9 @@ function ProductPage({
               </motion.button>
             </div>
 
+            {/* Pincode Checker - NEW */}
+            <PincodeChecker weight={0.5} />
+
             <div className="delivery-info" style={{
               background: isDarkMode ? '#111' : '#fff',
               padding: '12px 16px',
@@ -1604,7 +1604,7 @@ function ProductPage({
               </p>
             </div>
 
-            {/* ✅ FAQ Section */}
+            {/* FAQ Section */}
             {product.faqs && product.faqs.length > 0 && (
               <FAQSection faqs={product.faqs} isDarkMode={isDarkMode} />
             )}
@@ -1666,7 +1666,7 @@ function ProductPage({
               </div>
 
               {canReview ? (
-                <motion.button 
+                <motion.button
                   className="write-review-btn"
                   onClick={() => setShowReviewModal(true)}
                   style={{
@@ -1690,8 +1690,8 @@ function ProductPage({
                 </p>
               ) : (
                 <p className="no-reviews" style={{ color: themeStyles.textMuted, fontSize: '14px' }}>
-                  {localStorage.getItem('loop_token') 
-                    ? 'You can review this product after purchasing it.' 
+                  {localStorage.getItem('loop_token')
+                    ? 'You can review this product after purchasing it.'
                     : 'Login to write a review.'}
                 </p>
               )}
@@ -1703,8 +1703,8 @@ function ProductPage({
                   </p>
                 ) : (
                   reviews.slice(0, 5).map(review => (
-                    <motion.div 
-                      key={review._id} 
+                    <motion.div
+                      key={review._id}
                       className="review-item"
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
@@ -1786,7 +1786,7 @@ function ProductPage({
 
         {/* Similar Products */}
         {similarProducts.length > 0 && (
-          <motion.div 
+          <motion.div
             className="similar-products"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1794,7 +1794,7 @@ function ProductPage({
             style={{ padding: '40px 0 60px', borderTop: isDarkMode ? '1px solid #333' : '1px solid #e8e0e5' }}
           >
             <h3 style={{ fontSize: '16px', marginBottom: '20px', color: '#D4AF37' }}>Similar Products</h3>
-            <motion.div 
+            <motion.div
               className="similar-grid"
               variants={staggerContainer}
               initial="hidden"
@@ -1808,8 +1808,8 @@ function ProductPage({
                   whileHover={{ y: -6, scale: 1.02 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <Link 
-                    to={`/product/${p.productId || p.name.toLowerCase().replace(/ /g, '-')}`} 
+                  <Link
+                    to={`/product/${p.productId || p.name.toLowerCase().replace(/ /g, '-')}`}
                     className="similar-card"
                     style={{
                       background: isDarkMode ? '#111' : '#fff',
@@ -1824,13 +1824,13 @@ function ProductPage({
                       display: 'block'
                     }}
                   >
-                    <img 
-                      src={p.image || 'https://via.placeholder.com/150x150?text=LOOP'} 
-                      alt={p.name} 
-                      style={{ 
-                        width: '100%', 
-                        height: '180px', 
-                        objectFit: 'cover', 
+                    <img
+                      src={p.image || 'https://via.placeholder.com/150x150?text=LOOP'}
+                      alt={p.name}
+                      style={{
+                        width: '100%',
+                        height: '180px',
+                        objectFit: 'cover',
                         borderRadius: '4px',
                         transition: 'transform 0.4s ease'
                       }}
@@ -1851,7 +1851,7 @@ function ProductPage({
 
       {/* Fullscreen Modal */}
       {isFullscreen && (
-        <motion.div 
+        <motion.div
           className="fullscreen-modal"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1873,8 +1873,8 @@ function ProductPage({
             justifyContent: 'center'
           }}
         >
-          <motion.button 
-            className="modal-close" 
+          <motion.button
+            className="modal-close"
             onClick={closeFullscreen}
             whileHover={{ rotate: 90 }}
             transition={{ duration: 0.3 }}
@@ -1896,7 +1896,7 @@ function ProductPage({
           >
             ✕
           </motion.button>
-          
+
           <div className="modal-image-container" style={{
             width: '100%',
             height: '100%',
@@ -1906,15 +1906,15 @@ function ProductPage({
             position: 'relative',
             overflow: 'hidden'
           }}>
-            <MediaRenderer 
-              media={allMedia[fullscreenIndex] || allMedia[0]} 
+            <MediaRenderer
+              media={allMedia[fullscreenIndex] || allMedia[0]}
               className="modal-media"
               isFullscreen={true}
             />
-            
+
             {allMedia.length > 1 && (
               <>
-                <motion.button 
+                <motion.button
                   className="modal-arrow modal-arrow-left"
                   onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
                   whileHover={{ scale: 1.1 }}
@@ -1941,7 +1941,7 @@ function ProductPage({
                 >
                   ◀
                 </motion.button>
-                <motion.button 
+                <motion.button
                   className="modal-arrow modal-arrow-right"
                   onClick={(e) => { e.stopPropagation(); goToNext(); }}
                   whileHover={{ scale: 1.1 }}
@@ -1970,7 +1970,7 @@ function ProductPage({
                 </motion.button>
               </>
             )}
-            
+
             <div className="modal-image-counter" style={{
               position: 'absolute',
               bottom: '30px',
@@ -1985,10 +1985,10 @@ function ProductPage({
               backdropFilter: 'blur(4px)'
             }}>
               {fullscreenIndex + 1} / {allMedia.length}
-              {allMedia[fullscreenIndex] && 
+              {allMedia[fullscreenIndex] &&
                 ` - ${isVideoUrl(allMedia[fullscreenIndex]) ? '🎬 Video' : '📸 Image'}`}
             </div>
-            
+
             <div className="modal-swipe-hint" style={{
               position: 'absolute',
               bottom: '80px',

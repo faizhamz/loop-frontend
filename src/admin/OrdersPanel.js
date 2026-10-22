@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
-import { motion, AnimatePresence } from 'framer-motion';
-import ShippingLabelModal from '../components/ShippingLabelModal';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://loop-backend-jwke.onrender.com';
 
@@ -10,9 +8,6 @@ function OrdersPanel() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrder, setExpandedOrder] = useState(null);
-  const [trackingData, setTrackingData] = useState({});
-  const [showTrackingModal, setShowTrackingModal] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState(null);
@@ -20,27 +15,7 @@ function OrdersPanel() {
   const [expandedModalSections, setExpandedModalSections] = useState([]);
   const [cleanupStats, setCleanupStats] = useState(null);
   const [cleaning, setCleaning] = useState(false);
-
-  // Shipping Label Modal State
-  const [showLabelModal, setShowLabelModal] = useState(false);
-  const [selectedOrderForLabel, setSelectedOrderForLabel] = useState(null);
-  const [labelGenerating, setLabelGenerating] = useState(false);
-
-  // ============================================
-  // ✅ NEW: Print Options State
-  // ============================================
-  const [showPrintOptions, setShowPrintOptions] = useState(false);
-  const [printOrder, setPrintOrder] = useState(null);
-  const [printFormat, setPrintFormat] = useState('thermal-4x6');
-  const [printCopies, setPrintCopies] = useState(1);
-  const [printIncludeItems, setPrintIncludeItems] = useState(true);
-
-  const printFormats = [
-    { value: 'thermal-4x6', label: 'Thermal (4×6")', icon: '🖨️', description: 'Standard shipping label size' },
-    { value: 'a4', label: 'A4 Sheet', icon: '📄', description: 'Full page A4 (210×297mm)' },
-    { value: 'a5', label: 'A5 Sheet', icon: '📄', description: 'Half page A5 (148×210mm)' },
-    { value: 'label-4x4', label: 'Square Label (4×4")', icon: '🏷️', description: 'Small square label' }
-  ];
+  const [shippingId, setShippingId] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -50,7 +25,7 @@ function OrdersPanel() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('loop_token');
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
       const response = await axios.get(`${API_URL}/api/orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -64,7 +39,7 @@ function OrdersPanel() {
 
   const fetchCleanupStats = async () => {
     try {
-      const token = localStorage.getItem('loop_token');
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
       const response = await axios.get(`${API_URL}/api/admin/cleanup-stats`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -76,10 +51,10 @@ function OrdersPanel() {
 
   const handleCleanup = async () => {
     if (!window.confirm(`This will cancel ${cleanupStats?.expiredPendingOrders || 0} pending orders older than 30 minutes. Continue?`)) return;
-    
+
     setCleaning(true);
     try {
-      const token = localStorage.getItem('loop_token');
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
       const response = await axios.post(`${API_URL}/api/admin/cleanup-pending-orders`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -95,136 +70,95 @@ function OrdersPanel() {
   };
 
   // ============================================
-  // ✅ NEW: Print Label with Format Options
+  // SHIPROCKET ACTIONS
   // ============================================
-  const openPrintOptions = (order) => {
-    setPrintOrder(order);
-    setShowPrintOptions(true);
-  };
-
-  const handlePrintLabel = async () => {
-    if (!printOrder) return;
-
+  const createShipment = async (order) => {
+    if (!window.confirm(`Create shipment for order ${order.orderId}?`)) return;
+    setShippingId(order._id);
     try {
-      const token = localStorage.getItem('loop_token');
-      
-      // First check if label exists
-      const checkResponse = await axios.get(
-        `${API_URL}/api/labels/order/${printOrder._id}`,
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
+      const response = await axios.post(
+        `${API_URL}/api/shiprocket/create/${order._id}`,
+        {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
-      let downloadUrl = checkResponse.data.downloadUrl;
-      
-      // If label doesn't exist, generate it first
-      if (!downloadUrl) {
-        setLabelGenerating(true);
-        const generateResponse = await axios.post(
-          `${API_URL}/api/labels/generate/${printOrder._id}`,
-          { 
-            courier: 'delhivery',
-            courierName: 'Delhivery',
-            format: printFormat,
-            instructions: ''
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        
-        if (generateResponse.data.success) {
-          downloadUrl = generateResponse.data.downloadUrl;
-        } else {
-          alert('Failed to generate label');
-          setLabelGenerating(false);
-          return;
-        }
-        setLabelGenerating(false);
-      }
-
-      // Open print window with format parameter
-      const printWindow = window.open(
-        `${API_URL}${downloadUrl}?token=${token}&format=${printFormat}&copies=${printCopies}`,
-        '_blank'
-      );
-      
-      if (printWindow) {
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print();
-          }, 500);
-        };
-      }
-      
-      setShowPrintOptions(false);
-      setPrintOrder(null);
-      
-    } catch (err) {
-      console.error('Print label error:', err);
-      if (err.response?.status === 404) {
-        if (window.confirm('No shipping label found. Would you like to generate one now?')) {
-          openLabelModal(printOrder);
-        }
+      if (response.data.success) {
+        alert(`✅ Shipment created!\nAWB: ${response.data.awbCode || 'Generating...'}\nCourier: ${response.data.courierName || 'Auto-assigned'}`);
+        fetchOrders();
       } else {
-        alert('Failed to print label: ' + (err.response?.data?.error || err.message));
+        alert(response.data.error || 'Failed to create shipment');
       }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to create shipment');
     } finally {
-      setLabelGenerating(false);
+      setShippingId(null);
     }
   };
 
-  // ============================================
-  // ✅ NEW: Bulk Print Labels
-  // ============================================
-  const handleBulkPrint = async () => {
-    const shippedOrders = orders.filter(o => o.tracking?.number);
-    if (shippedOrders.length === 0) {
-      alert('No orders with shipping labels found.');
-      return;
-    }
-    
-    if (!window.confirm(`Print labels for ${shippedOrders.length} orders?`)) return;
-    
-    const token = localStorage.getItem('loop_token');
-    let printed = 0;
-    
-    for (const order of shippedOrders) {
-      try {
-        const response = await axios.get(
-          `${API_URL}/api/labels/order/${order._id}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        
-        if (response.data.downloadUrl) {
-          const printWindow = window.open(
-            `${API_URL}${response.data.downloadUrl}?token=${token}`,
-            '_blank'
-          );
-          if (printWindow) {
-            printWindow.onload = () => {
-              setTimeout(() => {
-                printWindow.print();
-              }, 500);
-            };
-          }
-          printed++;
-          // Small delay between prints
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      } catch (err) {
-        console.error('Failed to print order:', order.orderId, err);
+  const downloadLabel = async (order) => {
+    try {
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
+      const response = await axios.get(
+        `${API_URL}/api/shiprocket/label/${order._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data.labelUrl) {
+        window.open(response.data.labelUrl, '_blank');
+      } else {
+        alert('Label not ready yet. Try again in 30 seconds.');
       }
+    } catch (err) {
+      alert(err.response?.data?.error || 'Could not fetch label');
     }
-    
-    alert(`✅ Printed ${printed} labels`);
   };
 
-  const openLabelModal = (order) => {
-    setSelectedOrderForLabel(order);
-    setShowLabelModal(true);
+  const schedulePickup = async (order) => {
+    if (!window.confirm(`Schedule pickup for ${order.orderId}?`)) return;
+    try {
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
+      await axios.post(
+        `${API_URL}/api/shiprocket/pickup/${order._id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('✅ Pickup scheduled! Courier will pick up today or tomorrow.');
+      fetchOrders();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to schedule pickup');
+    }
   };
 
-  const handleLabelGenerated = (labelData) => {
-    console.log('✅ Label generated:', labelData);
-    fetchOrders();
+  const cancelShipment = async (order) => {
+    if (!window.confirm(`Cancel shipment for ${order.orderId}?`)) return;
+    try {
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
+      await axios.post(
+        `${API_URL}/api/shiprocket/cancel/${order._id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('✅ Shipment cancelled');
+      fetchOrders();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to cancel shipment');
+    }
+  };
+
+  const requestReturn = async (order) => {
+    const reason = prompt('Return reason (e.g., wrong scent, damaged):');
+    if (!reason) return;
+    try {
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
+      await axios.post(
+        `${API_URL}/api/shiprocket/return/${order._id}`,
+        { reason },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert('✅ Return pickup scheduled');
+      fetchOrders();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to request return');
+    }
   };
 
   // ============================================
@@ -232,23 +166,24 @@ function OrdersPanel() {
   // ============================================
   const filteredOrders = useMemo(() => {
     let result = orders;
-    
+
     if (statusFilter !== 'all') {
       result = result.filter(order => order.status === statusFilter);
     }
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase().trim();
-      result = result.filter(order => 
+      result = result.filter(order =>
         order.orderId?.toLowerCase().includes(term) ||
         order.customer?.name?.toLowerCase().includes(term) ||
         order.customer?.email?.toLowerCase().includes(term) ||
         order.customer?.phone?.includes(term) ||
         order.customer?.address?.city?.toLowerCase().includes(term) ||
+        order.shiprocket?.awbCode?.toLowerCase().includes(term) ||
         order.items?.some(item => item.name?.toLowerCase().includes(term))
       );
     }
-    
+
     return result;
   }, [orders, statusFilter, searchTerm]);
 
@@ -256,7 +191,7 @@ function OrdersPanel() {
   // EXPORT
   // ============================================
   const exportCSV = () => {
-    const headers = ['Order ID', 'Date', 'Customer', 'Email', 'Phone', 'Items', 'Total', 'Status', 'Payment Status'];
+    const headers = ['Order ID', 'Date', 'Customer', 'Email', 'Phone', 'Items', 'Total', 'Status', 'Payment Status', 'AWB', 'Courier'];
     const rows = filteredOrders.map(order => [
       order.orderId || 'N/A',
       new Date(order.createdAt).toLocaleDateString(),
@@ -266,7 +201,9 @@ function OrdersPanel() {
       order.items?.length || 0,
       order.total || 0,
       order.status || 'pending',
-      order.paymentStatus || 'pending'
+      order.paymentStatus || 'pending',
+      order.shiprocket?.awbCode || '',
+      order.shiprocket?.courierName || ''
     ]);
 
     const csvContent = [
@@ -295,7 +232,9 @@ function OrdersPanel() {
       'Items': order.items?.length || 0,
       'Total': order.total || 0,
       'Status': order.status || 'pending',
-      'Payment Status': order.paymentStatus || 'pending'
+      'Payment Status': order.paymentStatus || 'pending',
+      'AWB': order.shiprocket?.awbCode || '',
+      'Courier': order.shiprocket?.courierName || ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -309,7 +248,7 @@ function OrdersPanel() {
   // ============================================
   const updateStatus = async (id, newStatus) => {
     try {
-      const token = localStorage.getItem('loop_token');
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
       await axios.put(`${API_URL}/api/orders/${id}`, { status: newStatus }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -323,7 +262,7 @@ function OrdersPanel() {
   const deleteOrder = async (id) => {
     if (!window.confirm('Delete this order?')) return;
     try {
-      const token = localStorage.getItem('loop_token');
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
       await axios.delete(`${API_URL}/api/orders/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -344,21 +283,21 @@ function OrdersPanel() {
   };
 
   const toggleModalSection = (section) => {
-    setExpandedModalSections(prev => 
-      prev.includes(section) 
-        ? prev.filter(s => s !== section) 
+    setExpandedModalSections(prev =>
+      prev.includes(section)
+        ? prev.filter(s => s !== section)
         : [...prev, section]
     );
   };
 
   const downloadInvoice = async (orderId) => {
     try {
-      const token = localStorage.getItem('loop_token');
+      const token = localStorage.getItem('loop_token') || localStorage.getItem('admin_token');
       const response = await axios.get(`${API_URL}/api/orders/${orderId}/invoice`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
-      
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -369,39 +308,6 @@ function OrdersPanel() {
     } catch (error) {
       console.error('Error downloading invoice:', error);
       alert('Failed to download invoice. Please try again.');
-    }
-  };
-
-  const handleAddTracking = (orderId) => {
-    setSelectedOrderId(orderId);
-    setTrackingData({
-      number: '',
-      courier: '',
-      courierName: '',
-      url: ''
-    });
-    setShowTrackingModal(true);
-  };
-
-  const submitTracking = async () => {
-    if (!trackingData.number) {
-      alert('Please enter a tracking number');
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('loop_token');
-      await axios.post(
-        `${API_URL}/api/orders/${selectedOrderId}/tracking`,
-        trackingData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setShowTrackingModal(false);
-      fetchOrders();
-      alert('✅ Tracking number added! Order status updated to Shipped.');
-    } catch (error) {
-      console.error('Error adding tracking:', error);
-      alert('Failed to add tracking number');
     }
   };
 
@@ -560,23 +466,6 @@ function OrdersPanel() {
           >
             📊 Excel
           </button>
-          {/* ✅ Bulk Print Button */}
-          <button
-            onClick={handleBulkPrint}
-            className="export-btn"
-            style={{
-              padding: '8px 16px',
-              background: '#8B5CF6',
-              border: 'none',
-              borderRadius: '6px',
-              color: '#fff',
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              marginRight: '8px'
-            }}
-          >
-            🖨️ Bulk Print
-          </button>
           {cleanupStats?.expiredPendingOrders > 0 && (
             <span className="cleanup-warning-badge">
               ⚠️ {cleanupStats.expiredPendingOrders} pending
@@ -615,7 +504,7 @@ function OrdersPanel() {
         <div className="search-wrapper" style={{ display: 'flex', gap: '10px', flex: 1 }}>
           <input
             type="text"
-            placeholder="🔍 Search by Order ID, Customer, Email, Phone..."
+            placeholder="🔍 Search by Order ID, Customer, AWB, Phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -680,8 +569,8 @@ function OrdersPanel() {
                     <td className="order-id-cell">
                       <strong>{order.orderId}</strong>
                       <span className="order-date">{formatDate(order.createdAt)}</span>
-                      {order.tracking?.number && (
-                        <span className="tracking-badge">📦 Track</span>
+                      {order.shiprocket?.awbCode && (
+                        <span className="tracking-badge">📦 {order.shiprocket.courierName || 'Track'}</span>
                       )}
                     </td>
                     <td>
@@ -707,9 +596,9 @@ function OrdersPanel() {
                       <strong>{formatCurrency(order.total)}</strong>
                     </td>
                     <td>
-                      <span 
+                      <span
                         className="payment-badge"
-                        style={{ 
+                        style={{
                           background: getPaymentStatusBadge(order.paymentStatus).color,
                           color: '#fff'
                         }}
@@ -718,7 +607,7 @@ function OrdersPanel() {
                       </span>
                     </td>
                     <td>
-                      <span 
+                      <span
                         className="status-badge"
                         style={{ background: getStatusColor(order.status) }}
                       >
@@ -735,7 +624,7 @@ function OrdersPanel() {
                         >
                           📋
                         </button>
-                        
+
                         {/* Invoice */}
                         <button
                           onClick={() => downloadInvoice(order._id)}
@@ -744,69 +633,68 @@ function OrdersPanel() {
                         >
                           📄
                         </button>
-                        
-                        {/* ✅ NEW: Print Label with Options */}
-                        {order.tracking?.number ? (
+
+                        {/* Shiprocket: Create Shipment */}
+                        {order.paymentStatus === 'paid' && !order.shiprocket?.shipmentId && order.status !== 'cancelled' && (
                           <button
-                            onClick={() => openPrintOptions(order)}
-                            className="action-btn print-btn"
-                            title="🖨️ Print Shipping Label"
-                            style={{
-                              background: 'rgba(40, 167, 69, 0.15)',
-                              color: '#28a745',
-                              border: 'none',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              transition: 'all 0.3s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'rgba(40, 167, 69, 0.25)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'rgba(40, 167, 69, 0.15)';
-                            }}
+                            onClick={() => createShipment(order)}
+                            disabled={shippingId === order._id}
+                            className="action-btn"
+                            title="Ship with Shiprocket"
+                            style={{ background: 'rgba(212, 175, 55, 0.15)', color: '#D4AF37' }}
                           >
-                            🖨️
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => openLabelModal(order)}
-                            className="action-btn label-btn"
-                            title="📦 Generate Shipping Label"
-                            style={{
-                              background: 'rgba(212, 175, 55, 0.15)',
-                              color: '#D4AF37',
-                              border: 'none',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              transition: 'all 0.3s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.25)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
-                            }}
-                          >
-                            📦
+                            {shippingId === order._id ? '⏳' : '📦'}
                           </button>
                         )}
-                        
-                        {/* Tracking */}
-                        {order.status !== 'delivered' && order.status !== 'cancelled' && (
+
+                        {/* Shiprocket: Download Label */}
+                        {order.shiprocket?.shipmentId && order.shiprocket?.awbCode && (
                           <button
-                            onClick={() => handleAddTracking(order._id)}
-                            className="action-btn track-btn"
-                            title="Add Tracking"
+                            onClick={() => downloadLabel(order)}
+                            className="action-btn"
+                            title="Download Label"
+                            style={{ background: 'rgba(40, 167, 69, 0.15)', color: '#28a745' }}
                           >
-                            🔗
+                            🏷️
                           </button>
                         )}
-                        
+
+                        {/* Shiprocket: Schedule Pickup */}
+                        {order.shiprocket?.shipmentId && !order.shiprocket?.pickupScheduledDate && (
+                          <button
+                            onClick={() => schedulePickup(order)}
+                            className="action-btn"
+                            title="Schedule Pickup"
+                            style={{ background: 'rgba(0, 102, 255, 0.15)', color: '#0066FF' }}
+                          >
+                            🚚
+                          </button>
+                        )}
+
+                        {/* Shiprocket: Cancel Shipment */}
+                        {order.shiprocket?.shipmentId && order.status !== 'delivered' && order.status !== 'cancelled' && (
+                          <button
+                            onClick={() => cancelShipment(order)}
+                            className="action-btn"
+                            title="Cancel Shipment"
+                            style={{ background: 'rgba(255, 68, 68, 0.15)', color: '#ff4444' }}
+                          >
+                            ✕
+                          </button>
+                        )}
+
+                        {/* Shiprocket: Request Return */}
+                        {order.status === 'delivered' && !order.shiprocket?.isReturn && (
+                          <button
+                            onClick={() => requestReturn(order)}
+                            className="action-btn"
+                            title="Request Return"
+                            style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#8B5CF6' }}
+                          >
+                            ↩️
+                          </button>
+                        )}
+
                         {/* Delete */}
                         <button
                           onClick={() => deleteOrder(order._id)}
@@ -816,7 +704,7 @@ function OrdersPanel() {
                           🗑️
                         </button>
                       </div>
-                      
+
                       <select
                         onChange={(e) => updateStatus(order._id, e.target.value)}
                         value={order.status || 'pending'}
@@ -831,7 +719,7 @@ function OrdersPanel() {
                       </select>
                     </td>
                   </tr>
-                  
+
                   {expandedOrder === order._id && (
                     <tr className="expanded-row">
                       <td colSpan="8">
@@ -874,12 +762,6 @@ function OrdersPanel() {
                                 <span>{formatCurrency(order.platformFee)}</span>
                               </div>
                             )}
-                            {order.gstAmount > 0 && (
-                              <div className="breakdown-row">
-                                <span>GST ({order.gstPercent || 12}%)</span>
-                                <span>{formatCurrency(order.gstAmount)}</span>
-                              </div>
-                            )}
                             {order.handlingFee > 0 && (
                               <div className="breakdown-row">
                                 <span>Handling Fee</span>
@@ -918,19 +800,24 @@ function OrdersPanel() {
                             ))}
                           </div>
 
-                          {order.tracking?.number && (
+                          {/* Shiprocket Tracking Info */}
+                          {order.shiprocket?.awbCode && (
                             <div className="expanded-section tracking-info">
-                              <h4>📦 Tracking Information</h4>
+                              <h4>📦 Shiprocket Tracking</h4>
                               <div className="tracking-details">
-                                <span><strong>Number:</strong> {order.tracking.number}</span>
-                                {order.tracking.courierName && (
-                                  <span><strong>Courier:</strong> {order.tracking.courierName}</span>
+                                <span><strong>AWB:</strong> {order.shiprocket.awbCode}</span>
+                                {order.shiprocket.courierName && (
+                                  <span><strong>Courier:</strong> {order.shiprocket.courierName}</span>
                                 )}
-                                {order.tracking.url && (
-                                  <a href={order.tracking.url} target="_blank" rel="noopener noreferrer">
-                                    🔗 Track Package
-                                  </a>
+                                {order.shiprocket.currentStatus && (
+                                  <span><strong>Status:</strong> {order.shiprocket.currentStatus}</span>
                                 )}
+                                {order.shiprocket.etd && (
+                                  <span><strong>ETA:</strong> {new Date(order.shiprocket.etd).toLocaleDateString()}</span>
+                                )}
+                                <a href={`https://shiprocket.co/tracking/${order.shiprocket.awbCode}`} target="_blank" rel="noopener noreferrer">
+                                  🔗 Track on Shiprocket
+                                </a>
                               </div>
                             </div>
                           )}
@@ -945,175 +832,6 @@ function OrdersPanel() {
         </table>
       </div>
 
-      {/* ============================================ */}
-      {/* ✅ PRINT OPTIONS MODAL - NEW */}
-      {/* ============================================ */}
-      {showPrintOptions && printOrder && (
-        <div className="modal-overlay" onClick={() => setShowPrintOptions(false)}>
-          <div className="print-options-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>🖨️ Print Shipping Label</h3>
-              <button className="modal-close" onClick={() => setShowPrintOptions(false)}>✕</button>
-            </div>
-            
-            <div className="modal-body">
-              <div style={{ marginBottom: '16px' }}>
-                <p style={{ color: '#888', fontSize: '13px' }}>
-                  Order: <strong style={{ color: '#fff' }}>#{printOrder.orderId}</strong>
-                </p>
-                <p style={{ color: '#888', fontSize: '13px' }}>
-                  Customer: <strong style={{ color: '#fff' }}>{printOrder.customer?.name}</strong>
-                </p>
-                {printOrder.tracking?.number && (
-                  <p style={{ color: '#888', fontSize: '13px' }}>
-                    Tracking: <strong style={{ color: '#D4AF37' }}>{printOrder.tracking.number}</strong>
-                  </p>
-                )}
-              </div>
-
-              {/* Format Selection */}
-              <div className="form-group">
-                <label style={{ color: '#888', fontSize: '13px', display: 'block', marginBottom: '8px' }}>
-                  📄 Paper Format
-                </label>
-                <div className="print-format-grid" style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '10px'
-                }}>
-                  {printFormats.map(format => (
-                    <button
-                      key={format.value}
-                      type="button"
-                      className={`print-format-option ${printFormat === format.value ? 'active' : ''}`}
-                      onClick={() => setPrintFormat(format.value)}
-                      style={{
-                        padding: '12px 16px',
-                        border: `2px solid ${printFormat === format.value ? '#D4AF37' : '#333'}`,
-                        borderRadius: '8px',
-                        background: printFormat === format.value ? 'rgba(212, 175, 55, 0.05)' : 'transparent',
-                        color: printFormat === format.value ? '#D4AF37' : '#888',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        transition: 'all 0.3s ease',
-                        fontFamily: 'Nunito, sans-serif'
-                      }}
-                    >
-                      <div style={{ fontSize: '24px', marginBottom: '4px' }}>{format.icon}</div>
-                      <div style={{ fontSize: '13px', fontWeight: '600' }}>{format.label}</div>
-                      <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
-                        {format.description}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Number of Copies */}
-              <div className="form-group">
-                <label style={{ color: '#888', fontSize: '13px', display: 'block', marginBottom: '4px' }}>
-                  📋 Number of Copies
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <button
-                    onClick={() => setPrintCopies(Math.max(1, printCopies - 1))}
-                    style={{
-                      padding: '6px 14px',
-                      background: '#333',
-                      border: 'none',
-                      borderRadius: '4px',
-                      color: '#fff',
-                      cursor: 'pointer',
-                      fontSize: '16px'
-                    }}
-                  >
-                    −
-                  </button>
-                  <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#fff', minWidth: '40px', textAlign: 'center' }}>
-                    {printCopies}
-                  </span>
-                  <button
-                    onClick={() => setPrintCopies(Math.min(10, printCopies + 1))}
-                    style={{
-                      padding: '6px 14px',
-                      background: '#333',
-                      border: 'none',
-                      borderRadius: '4px',
-                      color: '#fff',
-                      cursor: 'pointer',
-                      fontSize: '16px'
-                    }}
-                  >
-                    +
-                  </button>
-                  <span style={{ color: '#666', fontSize: '12px' }}>Max 10</span>
-                </div>
-              </div>
-
-              {/* Include Items List */}
-              <div className="form-group">
-                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={printIncludeItems}
-                    onChange={(e) => setPrintIncludeItems(e.target.checked)}
-                    style={{ accentColor: '#D4AF37', width: '18px', height: '18px' }}
-                  />
-                  Include items list on label
-                </label>
-                <span style={{ color: '#666', fontSize: '11px', display: 'block', marginTop: '4px' }}>
-                  Recommended for A4/A5 formats, not needed for thermal labels
-                </span>
-              </div>
-            </div>
-
-            <div className="modal-footer" style={{
-              display: 'flex',
-              gap: '10px',
-              padding: '14px 20px',
-              borderTop: '1px solid #333',
-              background: '#0a0a0a',
-              borderRadius: '0 0 16px 16px'
-            }}>
-              <button
-                className="btn-secondary"
-                onClick={() => setShowPrintOptions(false)}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  background: '#333',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  fontWeight: '600'
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-primary"
-                onClick={handlePrintLabel}
-                disabled={labelGenerating}
-                style={{
-                  flex: 2,
-                  padding: '10px',
-                  background: '#D4AF37',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#000',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  opacity: labelGenerating ? 0.6 : 1
-                }}
-              >
-                {labelGenerating ? '⏳ Generating...' : '🖨️ Print Label'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Order Details Modal */}
       {showOrderDetailsModal && selectedOrderForDetails && (
         <div className="modal-overlay" onClick={() => setShowOrderDetailsModal(false)}>
@@ -1124,7 +842,6 @@ function OrdersPanel() {
             </div>
 
             <div className="modal-body">
-              {/* Customer Information */}
               <div className="detail-section customer-section">
                 <div className="section-header">
                   <h4>👤 Customer Information</h4>
@@ -1138,7 +855,6 @@ function OrdersPanel() {
                 </div>
               </div>
 
-              {/* Shipping Address */}
               <div className="detail-section shipping-section">
                 <div className="section-header">
                   <h4>📍 Shipping Address</h4>
@@ -1157,7 +873,6 @@ function OrdersPanel() {
                 )}
               </div>
 
-              {/* Order Items */}
               <div className="detail-section items-section">
                 <div className="section-header">
                   <h4>🛒 Order Items</h4>
@@ -1186,7 +901,6 @@ function OrdersPanel() {
                 </div>
               </div>
 
-              {/* Expandable Details */}
               <div className={`expandable-card ${expandedModalSections.includes('allDetails') ? 'expanded' : ''}`}>
                 <div className="expandable-card-header" onClick={() => toggleModalSection('allDetails')}>
                   <span className="expand-icon">
@@ -1196,15 +910,15 @@ function OrdersPanel() {
                     {expandedModalSections.includes('allDetails') ? 'Hide Order Details' : 'View Order Details'}
                   </span>
                 </div>
-                
+
                 {expandedModalSections.includes('allDetails') && (
                   <div className="expandable-card-body">
                     <div className="detail-sub-section">
                       <h5>💳 Payment Information</h5>
                       <div className="detail-grid">
                         <div><strong>Method:</strong> {selectedOrderForDetails.paymentMethod || 'UPI'}</div>
-                        <div><strong>Status:</strong> 
-                          <span className="payment-badge" style={{ 
+                        <div><strong>Status:</strong>
+                          <span className="payment-badge" style={{
                             background: getPaymentStatusBadge(selectedOrderForDetails.paymentStatus).color,
                             color: '#fff',
                             padding: '2px 10px',
@@ -1230,9 +944,6 @@ function OrdersPanel() {
                         <div className="breakdown-item"><span>📦 Shipping</span><span>{formatCurrency(selectedOrderForDetails.shipping)}</span></div>
                         {selectedOrderForDetails.platformFee > 0 && (
                           <div className="breakdown-item"><span>🏷️ Platform Fee</span><span>{formatCurrency(selectedOrderForDetails.platformFee)}</span></div>
-                        )}
-                        {selectedOrderForDetails.gstAmount > 0 && (
-                          <div className="breakdown-item"><span>📊 GST</span><span>{formatCurrency(selectedOrderForDetails.gstAmount)}</span></div>
                         )}
                         {selectedOrderForDetails.handlingFee > 0 && (
                           <div className="breakdown-item"><span>🔧 Handling</span><span>{formatCurrency(selectedOrderForDetails.handlingFee)}</span></div>
@@ -1263,21 +974,37 @@ function OrdersPanel() {
                     </div>
 
                     <div className="detail-sub-section">
-                      <h5>📦 Tracking Information</h5>
-                      {selectedOrderForDetails.tracking?.number ? (
+                      <h5>📦 Shiprocket Tracking</h5>
+                      {selectedOrderForDetails.shiprocket?.awbCode ? (
                         <div className="tracking-details">
-                          <span><strong>📮 Tracking:</strong> {selectedOrderForDetails.tracking.number}</span>
-                          {selectedOrderForDetails.tracking.courierName && (
-                            <span><strong>🚚 Courier:</strong> {selectedOrderForDetails.tracking.courierName}</span>
+                          <span><strong>📮 AWB:</strong> {selectedOrderForDetails.shiprocket.awbCode}</span>
+                          {selectedOrderForDetails.shiprocket.courierName && (
+                            <span><strong>🚚 Courier:</strong> {selectedOrderForDetails.shiprocket.courierName}</span>
                           )}
-                          {selectedOrderForDetails.tracking.url && (
-                            <a href={selectedOrderForDetails.tracking.url} target="_blank" rel="noopener noreferrer">🔗 Track Package →</a>
+                          {selectedOrderForDetails.shiprocket.currentStatus && (
+                            <span><strong>Status:</strong> {selectedOrderForDetails.shiprocket.currentStatus}</span>
                           )}
+                          <a href={`https://shiprocket.co/tracking/${selectedOrderForDetails.shiprocket.awbCode}`} target="_blank" rel="noopener noreferrer">🔗 Track Package →</a>
                         </div>
                       ) : (
-                        <p className="no-data">No tracking information available</p>
+                        <p className="no-data">No shipment created yet</p>
                       )}
                     </div>
+
+                    {/* Refund Info */}
+                    {selectedOrderForDetails.refund?.status && selectedOrderForDetails.refund.status !== 'none' && (
+                      <div className="detail-sub-section">
+                        <h5>💸 Refund</h5>
+                        <div className="detail-grid">
+                          <div><strong>Status:</strong> {selectedOrderForDetails.refund.status}</div>
+                          <div><strong>Method:</strong> {selectedOrderForDetails.refund.method}</div>
+                          <div><strong>Amount:</strong> {formatCurrency(selectedOrderForDetails.refund.amount)}</div>
+                          {selectedOrderForDetails.refund.razorpayRefundId && (
+                            <div><strong>Razorpay ID:</strong> {selectedOrderForDetails.refund.razorpayRefundId}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1290,159 +1017,6 @@ function OrdersPanel() {
           </div>
         </div>
       )}
-
-      {/* Tracking Modal */}
-      {showTrackingModal && (
-        <div className="modal-overlay" onClick={() => setShowTrackingModal(false)}>
-          <div className="tracking-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>📦 Add Tracking Number</h3>
-              <button className="modal-close" onClick={() => setShowTrackingModal(false)}>✕</button>
-            </div>
-            
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Tracking Number *</label>
-                <input
-                  type="text"
-                  placeholder="e.g., 1234567890"
-                  value={trackingData.number}
-                  onChange={(e) => setTrackingData({ ...trackingData, number: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Courier</label>
-                <select
-                  value={trackingData.courier}
-                  onChange={(e) => setTrackingData({ ...trackingData, courier: e.target.value })}
-                >
-                  <option value="">Select Courier</option>
-                  <option value="delhivery">Delhivery</option>
-                  <option value="bluedart">Blue Dart</option>
-                  <option value="dtdc">DTDC</option>
-                  <option value="xpressbees">XpressBees</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Courier Name (Custom)</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Amazon Shipping"
-                  value={trackingData.courierName}
-                  onChange={(e) => setTrackingData({ ...trackingData, courierName: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Tracking URL (optional)</label>
-                <input
-                  type="text"
-                  placeholder="https://track.courier.com/123456"
-                  value={trackingData.url}
-                  onChange={(e) => setTrackingData({ ...trackingData, url: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowTrackingModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={submitTracking}>✅ Add Tracking</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Shipping Label Modal */}
-      {showLabelModal && selectedOrderForLabel && (
-        <ShippingLabelModal
-          isOpen={showLabelModal}
-          onClose={() => {
-            setShowLabelModal(false);
-            setSelectedOrderForLabel(null);
-          }}
-          order={selectedOrderForLabel}
-          onLabelGenerated={handleLabelGenerated}
-        />
-      )}
-
-      {/* ============================================ */}
-      {/* STYLES FOR PRINT OPTIONS */}
-      {/* ============================================ */}
-      <style>{`
-        .print-options-modal {
-          background: #111;
-          border-radius: 16px;
-          width: 100%;
-          max-width: 520px;
-          max-height: 90vh;
-          overflow: hidden;
-          border: 1px solid #333;
-          animation: modalSlideIn 0.3s ease;
-        }
-
-        .print-options-modal .modal-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 16px 20px;
-          border-bottom: 1px solid #333;
-          background: #111;
-        }
-
-        .print-options-modal .modal-header h3 {
-          color: #D4AF37;
-          margin: 0;
-          font-size: 18px;
-          font-family: 'Nunito', sans-serif;
-        }
-
-        .print-options-modal .modal-body {
-          padding: 20px;
-          overflow-y: auto;
-          max-height: calc(90vh - 140px);
-        }
-
-        .print-options-modal .modal-footer {
-          display: flex;
-          gap: 10px;
-          padding: 14px 20px;
-          border-top: 1px solid #333;
-          background: #0a0a0a;
-        }
-
-        .print-format-option:hover {
-          border-color: #666 !important;
-          transform: translateY(-2px);
-        }
-
-        .print-format-option.active {
-          border-color: #D4AF37 !important;
-          background: rgba(212, 175, 55, 0.05) !important;
-          color: #D4AF37 !important;
-          box-shadow: 0 4px 20px rgba(212, 175, 55, 0.1);
-        }
-
-        .print-format-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
-
-        @media (max-width: 480px) {
-          .print-format-grid {
-            grid-template-columns: 1fr;
-          }
-          
-          .print-options-modal {
-            max-width: 100%;
-            margin: 10px;
-            border-radius: 12px;
-          }
-        }
-      `}</style>
     </div>
   );
 }
