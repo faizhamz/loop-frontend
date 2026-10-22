@@ -1,0 +1,99 @@
+.pincode-checker {
+  margin: 16px 0;
+  padding: 14px 16px;
+  background: var(--bg-tertiary, #f8f4f9);
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #e8e0e5);
+}
+
+.pincode-checker-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.pincode-checker-icon {
+  font-size: 16px;
+}
+
+.pincode-checker-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #2d1b2e);
+}
+
+.pincode-checker-form {
+  display: flex;
+  gap: 8px;
+}
+
+.pincode-checker-input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--border-color, #e8e0e5);
+  border-radius: 8px;
+  background: var(--bg-secondary, #fff);
+  color: var(--text-primary, #2d1b2e);
+  font-size: 13px;
+  transition: border-color 0.2s ease;
+}
+
+.pincode-checker-input:focus {
+  outline: none;
+  border-color: #B8935A;
+}
+
+.pincode-checker-btn {
+  padding: 9px 18px;
+  background: #B8935A;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  min-width: 68px;
+}
+
+.pincode-checker-btn:hover:not(:disabled) {
+  background: #A4804D;
+}
+
+.pincode-checker-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pincode-checker-error {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #ff4444;
+}
+
+.pincode-checker-success {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #2d1b2e;
+}
+
+.pincode-checker-success strong {
+  color: #28a745;
+}
+
+.pincode-checker-note {
+  color: var(--text-muted, #888);
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+@media (max-width: 480px) {
+  .pincode-checker {
+    padding: 12px;
+  }
+  .pincode-checker-btn {
+    padding: 9px 14px;
+    font-size: 12px;
+  }
+}
