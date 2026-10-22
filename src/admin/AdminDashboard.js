@@ -13,6 +13,7 @@ import CategoriesPanel from './CategoriesPanel';
 import AnalyticsPanel from './AnalyticsPanel';
 import MarketingPanel from './MarketingPanel';
 import ShiprocketWidget from '../components/ShiprocketWidget';
+import AdminNotificationBell from '../components/AdminNotificationBell';
 import axios from 'axios';
 import './Admin.css';
 import './MarketingPanel.css';
@@ -206,6 +207,20 @@ function AdminDashboard() {
       </div>
 
       <div className="admin-content" style={{ paddingTop: '80px' }}>
+        {/* Admin Notification Bell — sticky top right */}
+        <div style={{
+          position: 'sticky',
+          top: '70px',
+          zIndex: 100,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          padding: '12px 0',
+          background: '#0a0a0a',
+          marginBottom: '12px'
+        }}>
+          <AdminNotificationBell />
+        </div>
+
         {activeTab === 'dashboard' && (
           <div>
             <h1 style={{ color: '#fff' }}>📊 Dashboard</h1>
@@ -220,7 +235,6 @@ function AdminDashboard() {
               <div className="stat-card"><h3>{stats.totalNotifications}</h3><p>Notifications</p></div>
             </div>
 
-            {/* Shiprocket Widget */}
             <ShiprocketWidget />
           </div>
         )}

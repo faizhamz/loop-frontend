@@ -21,13 +21,9 @@ function OrderHistory({ user, isLoggedIn }) {
   const [rating, setRating] = useState(0);
   const [ratingComment, setRatingComment] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [contactLoading, setContactLoading] = useState(true);
-  const [trackingData, setTrackingData] = useState({});
 
-  // Review Modal State
   const [reviewModal, setReviewModal] = useState(null);
 
-  // Fetch WhatsApp number
   useEffect(() => {
     const fetchContact = async () => {
       try {
@@ -37,21 +33,16 @@ function OrderHistory({ user, isLoggedIn }) {
         }
       } catch (err) {
         console.error('Error fetching contact:', err);
-      } finally {
-        setContactLoading(false);
       }
     };
     fetchContact();
   }, []);
 
-  // Memoized filtered and sorted orders
   const filteredOrders = useMemo(() => {
     let result = [...orders];
-
     if (statusFilter !== 'all') {
       result = result.filter(o => o.status === statusFilter);
     }
-
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(o =>
@@ -60,7 +51,6 @@ function OrderHistory({ user, isLoggedIn }) {
         o.shiprocket?.awbCode?.toLowerCase().includes(term)
       );
     }
-
     result.sort((a, b) => {
       switch (sortBy) {
         case 'oldest': return new Date(a.createdAt) - new Date(b.createdAt);
@@ -69,11 +59,9 @@ function OrderHistory({ user, isLoggedIn }) {
         default: return new Date(b.createdAt) - new Date(a.createdAt);
       }
     });
-
     return result;
   }, [orders, statusFilter, searchTerm, sortBy]);
 
-  // Stats
   const stats = useMemo(() => ({
     total: orders.length,
     pending: orders.filter(o => o.status === 'pending').length,
@@ -95,21 +83,17 @@ function OrderHistory({ user, isLoggedIn }) {
   useEffect(() => {
     const token = localStorage.getItem('loop_token');
     const userData = localStorage.getItem('loop_user');
-
     if (!token || !userData) {
       setError('Please login to view your orders');
       setLoading(false);
       return;
     }
-
     fetchOrders();
   }, []);
 
-  // Scroll to and highlight specific order from URL
   useEffect(() => {
     const pathParts = location.pathname.split('/');
     const orderIdFromUrl = pathParts[pathParts.length - 1];
-
     if (orderIdFromUrl && orderIdFromUrl !== 'orders' && orders.length > 0) {
       const timer = setTimeout(() => {
         const orderElement = document.getElementById(`order-${orderIdFromUrl}`);
@@ -162,7 +146,6 @@ function OrderHistory({ user, isLoggedIn }) {
       size: item.size || 'M',
       image: item.productId?.image || ''
     }));
-
     const existingCart = JSON.parse(localStorage.getItem('loop_cart') || '[]');
     const newCart = [...existingCart, ...cartItems];
     localStorage.setItem('loop_cart', JSON.stringify(newCart));
@@ -170,9 +153,7 @@ function OrderHistory({ user, isLoggedIn }) {
   }, [navigate]);
 
   const goToProduct = (productId) => {
-    if (productId) {
-      navigate(`/product/${productId}`);
-    }
+    if (productId) navigate(`/product/${productId}`);
   };
 
   const openWhatsApp = (orderId) => {
@@ -185,9 +166,6 @@ function OrderHistory({ user, isLoggedIn }) {
     window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  // ============================================
-  // TRACKING & REFUND
-  // ============================================
   const openLiveTracking = (order) => {
     if (order.tracking?.url) {
       window.open(order.tracking.url, '_blank');
@@ -198,34 +176,6 @@ function OrderHistory({ user, isLoggedIn }) {
     }
   };
 
-  const requestRefund = async (order) => {
-    const method = window.prompt(
-      'Refund method?\nType "wallet" for instant store credit\nType "razorpay" for bank/card refund (3-5 days)',
-      'wallet'
-    );
-
-    if (!method || !['wallet', 'razorpay'].includes(method.toLowerCase())) {
-      if (method !== null) alert('Invalid choice. Please type "wallet" or "razorpay".');
-      return;
-    }
-
-    const reason = window.prompt('Reason for refund (optional):') || 'Customer request';
-
-    try {
-      const token = localStorage.getItem('loop_token');
-      const response = await axios.post(
-        `${API_URL}/api/orders/${order.orderId}/refund-request`,
-        { method: method.toLowerCase(), reason },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      alert(response.data.message || '✅ Refund requested');
-      fetchOrders();
-    } catch (err) {
-      alert(err.response?.data?.error || 'Could not request refund');
-    }
-  };
-
-  // Open Review Modal
   const openReviewModal = (order) => {
     const unReviewedItem = order.items?.find(item => !item.isReviewed);
     if (unReviewedItem) {
@@ -246,7 +196,6 @@ function OrderHistory({ user, isLoggedIn }) {
       alert('Please select a rating');
       return;
     }
-
     try {
       const token = localStorage.getItem('loop_token');
       await axios.post(
@@ -254,7 +203,6 @@ function OrderHistory({ user, isLoggedIn }) {
         { rating, comment: ratingComment },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
       setShowRatingModal(false);
       setRating(0);
       setRatingComment('');
@@ -330,7 +278,7 @@ function OrderHistory({ user, isLoggedIn }) {
                 <button
                   className="whatsapp-help-btn"
                   onClick={() => openWhatsApp('')}
-                  title="Need help? Chat with us on WhatsApp"
+                  title="Need help? Chat with us on WhatsApp — 24/7"
                 >
                   💬
                 </button>
@@ -444,10 +392,6 @@ function OrderHistory({ user, isLoggedIn }) {
                   const isExpanded = selectedOrder === order._id;
                   const showRating = order.status === 'delivered' && !order.postOrderRating;
                   const isHighlighted = location.pathname.includes(order.orderId);
-                  const isDelivered = order.status === 'delivered';
-                  const isPaid = order.paymentStatus === 'paid';
-                  const canRefund = isDelivered && isPaid &&
-                    (!order.refund?.status || order.refund.status === 'none');
 
                   return (
                     <div
@@ -572,20 +516,6 @@ function OrderHistory({ user, isLoggedIn }) {
                                   🚚 Track Live
                                 </button>
                               )}
-                              {canRefund && (
-                                <button
-                                  className="order-action-btn"
-                                  onClick={() => requestRefund(order)}
-                                  style={{ color: '#8B5CF6' }}
-                                >
-                                  💸 Refund
-                                </button>
-                              )}
-                              {order.refund?.status === 'completed' && (
-                                <span style={{ color: '#28a745', fontSize: '12px', fontWeight: '600' }}>
-                                  ✅ Refunded via {order.refund.method}
-                                </span>
-                              )}
                             </>
                           )}
                           {order.status === 'shipped' && (order.tracking?.url || order.shiprocket?.awbCode) && (
@@ -595,6 +525,15 @@ function OrderHistory({ user, isLoggedIn }) {
                               style={{ color: '#0066FF' }}
                             >
                               🚚 Track Live
+                            </button>
+                          )}
+                          {whatsappNumber && (
+                            <button
+                              className="order-action-btn"
+                              onClick={() => openWhatsApp(order.orderId)}
+                              style={{ color: '#25D366' }}
+                            >
+                              💬 Support
                             </button>
                           )}
                         </div>
@@ -633,12 +572,10 @@ function OrderHistory({ user, isLoggedIn }) {
 
                           <div className="order-breakdown">
                             <h4>💰 Order Breakdown</h4>
-
                             <div className="breakdown-row">
                               <span>Subtotal ({order.items?.length || 0} items)</span>
                               <span>₹{order.subtotal || 0}</span>
                             </div>
-
                             <div className="breakdown-row">
                               <span>🚚 Shipping Fee</span>
                               {order.shipping === 0 ? (
@@ -647,17 +584,14 @@ function OrderHistory({ user, isLoggedIn }) {
                                 <span>₹{order.shipping || 0}</span>
                               )}
                             </div>
-
                             <div className="breakdown-row">
                               <span>✨ Platform Fee</span>
                               <span className="free-badge platform">FREE</span>
                             </div>
-
                             <div className="breakdown-row">
                               <span>💫 Handling Fee</span>
                               <span className="free-badge handling">FREE</span>
                             </div>
-
                             {order.discount > 0 && (
                               <div className="breakdown-row discount">
                                 <span>🎟️ Coupon Discount</span>
@@ -744,7 +678,7 @@ function OrderHistory({ user, isLoggedIn }) {
                                 className="whatsapp-order-btn"
                                 onClick={() => openWhatsApp(order.orderId)}
                               >
-                                💬 Need help with this order? Chat with us on WhatsApp
+                                💬 Need help with this order? Chat with us on WhatsApp — 24/7
                               </button>
                             </div>
                           )}
@@ -759,14 +693,12 @@ function OrderHistory({ user, isLoggedIn }) {
         )}
       </div>
 
-      {/* Rating Modal */}
       {showRatingModal && ratingOrder && (
         <div className="rating-modal-overlay" onClick={() => setShowRatingModal(false)}>
           <div className="rating-modal" onClick={(e) => e.stopPropagation()}>
             <button className="rating-modal-close" onClick={() => setShowRatingModal(false)}>✕</button>
             <h3>⭐ Rate Your Order</h3>
             <p className="rating-modal-subtitle">{ratingOrder.orderId}</p>
-
             <div className="rating-stars">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -785,7 +717,6 @@ function OrderHistory({ user, isLoggedIn }) {
               {rating === 4 && '😊 Very Good'}
               {rating === 5 && '🤩 Excellent!'}
             </div>
-
             <textarea
               className="rating-comment"
               placeholder="Share your experience (optional)"
@@ -793,7 +724,6 @@ function OrderHistory({ user, isLoggedIn }) {
               onChange={(e) => setRatingComment(e.target.value)}
               rows="3"
             />
-
             <div className="rating-modal-actions">
               <button className="rating-cancel-btn" onClick={() => setShowRatingModal(false)}>
                 Cancel
@@ -806,7 +736,6 @@ function OrderHistory({ user, isLoggedIn }) {
         </div>
       )}
 
-      {/* Review Modal */}
       {reviewModal && (
         <ReviewModal
           isOpen={!!reviewModal}
